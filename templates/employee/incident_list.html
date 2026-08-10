@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}My Incidents - Employee Portal{% endblock %}
+{% block page_title %}My Incidents{% endblock %}
+
+{% block content %}
+<!-- Header Bar -->
+<div class="row mb-4">
+    <div class="col-12 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div>
+            <p class="text-muted mb-0 small">Track the status of your reported IT issues.</p>
+        </div>
+        <div>
+            <a href="{% url 'employee_incident_create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1"></i> Report Incident
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Counter Summary -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="p-3 bg-white border rounded-3 shadow-sm text-center">
+            <span class="d-block text-muted small fw-semibold text-uppercase" style="font-size: 0.65rem;">Total Reported</span>
+            <span class="fs-4 fw-bold text-dark d-block mt-1">{{ stats.total }}</span>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="p-3 bg-white border rounded-3 shadow-sm text-center">
+            <span class="d-block text-muted small fw-semibold text-uppercase" style="font-size: 0.65rem; color: #f97316;">Open Status</span>
+            <span class="fs-4 fw-bold text-orange d-block mt-1" style="color: #ea580c;">{{ stats.open }}</span>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="p-3 bg-white border rounded-3 shadow-sm text-center">
+            <span class="d-block text-muted small fw-semibold text-uppercase" style="font-size: 0.65rem; color: #eab308;">In Progress</span>
+            <span class="fs-4 fw-bold text-yellow d-block mt-1" style="color: #ca8a04;">{{ stats.inprogress }}</span>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="p-3 bg-white border rounded-3 shadow-sm text-center">
+            <span class="d-block text-muted small fw-semibold text-uppercase" style="font-size: 0.65rem; color: #22c55e;">Resolved</span>
+            <span class="fs-4 fw-bold text-green d-block mt-1" style="color: #16a34a;">{{ stats.resolved }}</span>
+        </div>
+    </div>
+</div>
+
+<!-- Table Card -->
+<div class="row">
+    <div class="col-12">
+        <div class="card card-custom">
+            <div class="card-body p-0">
+                {% if page_obj %}
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0" style="font-size: 0.9rem;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="px-4 py-3">Incident ID</th>
+                                    <th class="py-3">Title</th>
+                                    <th class="py-3">Category</th>
+                                    <th class="py-3">Priority</th>
+                                    <th class="py-3">Status</th>
+                                    <th class="py-3">Reported At</th>
+                                    <th class="px-4 py-3 text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for incident in page_obj %}
+                                    <tr class="border-bottom">
+                                        <td class="px-4 py-3 fw-bold">
+                                            <a href="{% url 'employee_incident_detail' incident.pk %}" class="text-primary text-decoration-none">
+                                                {{ incident.incident_number }}
+                                            </a>
+                                        </td>
+                                        <td class="py-3 text-dark fw-medium">{{ incident.title }}</td>
+                                        <td class="py-3 text-secondary">{{ incident.get_category_display }}</td>
+                                        <td class="py-3">
+                                            <span class="badge-priority bg-priority-{{ incident.priority|lower }}">
+                                                {{ incident.get_priority_display }}
+                                            </span>
+                                        </td>
+                                        <td class="py-3">
+                                            <span class="badge-status status-{{ incident.status|lower }}">
+                                                {{ incident.get_status_display }}
+                                            </span>
+                                        </td>
+                                        <td class="py-3 text-muted small">{{ incident.created_at|date:"d M Y H:i" }}</td>
+                                        <td class="px-4 py-3 text-end">
+                                            <a href="{% url 'employee_incident_detail' incident.pk %}" class="btn btn-sm btn-outline-primary py-1 px-3">
+                                                View
+                                            </a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination Controls -->
+                    {% if page_obj.has_other_pages %}
+                        <nav class="d-flex justify-content-between align-items-center px-4 py-3 border-top bg-light">
+                            <span class="text-muted small">
+                                Showing Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                            </span>
+                            <ul class="pagination pagination-sm mb-0">
+                                {% if page_obj.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item disabled"><span class="page-link">Previous</span></li>
+                                {% endif %}
+                                
+                                {% for i in page_obj.paginator.page_range %}
+                                    <li class="page-item {% if page_obj.number == i %}active{% endif %}">
+                                        <a class="page-link" href="?page={{ i }}">{{ i }}</a>
+                                    </li>
+                                {% endfor %}
+                                
+                                {% if page_obj.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item disabled"><span class="page-link">Next</span></li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    {% endif %}
+                {% else %}
+                    <div class="py-5 text-center">
+                        <i class="bi bi-inbox text-muted" style="font-size: 2.5rem;"></i>
+                        <h6 class="text-secondary mt-3 fw-medium">No incidents reported yet.</h6>
+                        <p class="text-muted small mb-0">Everything looks quiet. Report an issue if you need IT assistance.</p>
+                        <a href="{% url 'employee_incident_create' %}" class="btn btn-sm btn-primary mt-3 px-4">
+                            Report Your First Incident
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

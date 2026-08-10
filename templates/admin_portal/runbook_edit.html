@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Runbook - {{ runbook.runbook_number }}{% endblock %}
+{% block page_title %}Edit Runbook Definition{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10 col-xl-8">
+        <!-- Inactive Alert Warning Banner -->
+        {% if not runbook.is_active %}
+            <div class="alert alert-secondary d-flex align-items-center mb-4 border border-secondary-subtle" role="alert">
+                <i class="bi bi-slash-circle-fill text-secondary me-2 fs-5"></i>
+                <div>
+                    <strong>INACTIVE:</strong> This runbook is currently deactivated. It will not be suggested by the AI retrieval engine until it is reactivated.
+                </div>
+            </div>
+        {% endif %}
+
+        <div class="card card-custom shadow-sm">
+            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-pencil-square text-primary me-2"></i>Modify {{ runbook.runbook_number }}</h5>
+                <span class="badge bg-light text-secondary border px-2 py-1 rounded small">Originally by {{ runbook.created_by.username }}</span>
+            </div>
+            <div class="card-body">
+                <form method="post" autocomplete="off">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="id_title" class="form-label small fw-semibold text-secondary">Runbook Title</label>
+                        {{ form.title }}
+                        {% for error in form.title.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label for="id_category" class="form-label small fw-semibold text-secondary">Service Category</label>
+                            {{ form.category }}
+                            {% for error in form.category.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="id_risk_level" class="form-label small fw-semibold text-secondary">Risk Level</label>
+                            {{ form.risk_level }}
+                            {% for error in form.risk_level.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="id_description" class="form-label small fw-semibold text-secondary">Problem Scope / Description</label>
+                        {{ form.description }}
+                        <div class="form-text small text-muted">{{ form.description.help_text }}</div>
+                        {% for error in form.description.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="id_symptoms" class="form-label small fw-semibold text-secondary">Indicative Symptoms (One per line)</label>
+                        {{ form.symptoms }}
+                        <div class="form-text small text-muted">{{ form.symptoms.help_text }}</div>
+                        {% for error in form.symptoms.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="id_steps" class="form-label small fw-semibold text-secondary">Troubleshooting & Resolution Steps</label>
+                        {{ form.steps }}
+                        {% for error in form.steps.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label for="id_automation_action" class="form-label small fw-semibold text-secondary">Automation Action Hook</label>
+                            {{ form.automation_action }}
+                            <div class="form-text small text-muted">{{ form.automation_action.help_text }}</div>
+                            {% for error in form.automation_action.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6 d-flex align-items-center">
+                            <div class="form-check mt-3">
+                                {{ form.is_active }}
+                                <label for="id_is_active" class="form-check-label small fw-semibold text-secondary">Active Status</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                        <a href="{% url 'runbook_detail' runbook.pk %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left me-1"></i> Back to Detail
+                        </a>
+                        <button type="submit" class="btn btn-primary px-4 fw-semibold">
+                            <i class="bi bi-save me-1"></i> Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

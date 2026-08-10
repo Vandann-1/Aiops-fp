@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Sign In - AIOps Service Desk{% endblock %}
+
+{% block login_content %}
+<div class="login-split-container">
+    <!-- Left Panel: Branding & Features -->
+    <div class="login-left-brand">
+        <div>
+            <h2><i class="bi bi-cpu-fill text-primary"></i> AIOps Service Desk</h2>
+            <p class="branding-subtext">Intelligent IT Operations & Incident Management</p>
+            
+            <div class="login-left-features mt-5">
+                <div class="feature-tag">
+                    <i class="bi bi-journal-text"></i>
+                    <div>
+                        <strong class="d-block">Semantic Runbook Retrieval</strong>
+                        <span class="text-secondary small">Compare incident descriptions and fetch recovery actions.</span>
+                    </div>
+                </div>
+                <div class="feature-tag">
+                    <i class="bi bi-shield-check"></i>
+                    <div>
+                        <strong class="d-block">Human-in-the-Loop Approval</strong>
+                        <span class="text-secondary small">IT Admins validate automation suggestions before execution.</span>
+                    </div>
+                </div>
+                <div class="feature-tag">
+                    <i class="bi bi-terminal"></i>
+                    <div>
+                        <strong class="d-block">Safe Predefined Automation</strong>
+                        <span class="text-secondary small">Execute allowlisted tasks safely to minimize downtime.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="small text-secondary">
+            &copy; 2026 AIOps Service Desk. All rights reserved.
+        </div>
+    </div>
+
+    <!-- Right Panel: Sign In Form -->
+    <div class="login-right-form">
+        <div class="login-form-wrapper">
+            <h3>Welcome Back</h3>
+            <p class="form-lead">Please sign in to access your dashboard.</p>
+            
+            <!-- Login Error Alerts -->
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-danger alert-dismissible fade show small py-2 px-3 mb-4" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i> {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" style="padding: 0.75rem 1rem;"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <form method="post" action="{% url 'login' %}" autocomplete="off">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="usernameInput" class="form-label small fw-semibold text-secondary">Username</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-person text-secondary"></i></span>
+                        <input type="text" name="username" id="usernameInput" class="form-control border-start-0 bg-light" placeholder="Enter username" required>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="passwordInput" class="form-label small fw-semibold text-secondary">Password</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="bi bi-lock text-secondary"></i></span>
+                        <input type="password" name="password" id="passwordInput" class="form-control border-start-0 bg-light" placeholder="Enter password" required>
+                    </div>
+                </div>
+
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary py-2 fw-semibold">
+                        <i class="bi bi-box-arrow-in-right me-1"></i> Sign In
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

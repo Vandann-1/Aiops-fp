@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+
+{% block title %}Operations Dashboard - AIOps Console{% endblock %}
+{% block page_title %}IT Operations Dashboard{% endblock %}
+
+{% block content %}
+<!-- Console Overview Banner -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="p-4 bg-white rounded-4 border shadow-sm">
+            <h4 class="mb-1 text-dark fw-bold">Console Overview</h4>
+            <p class="text-muted mb-0 small">AIOps status panel. Monitoring system incidents, runbook retrievals, and safety logs in real-time.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Admin Statistics Row -->
+<div class="row g-4 mb-4">
+    <!-- Total Incidents -->
+    <div class="col-12 col-sm-6 col-md-4 col-xl-2.4" style="flex: 1 1 200px;">
+        <div class="card-metric shadow-sm">
+            <div>
+                <div class="metric-label">Total Incidents</div>
+                <div class="metric-value">{{ total_incidents }}</div>
+            </div>
+            <div class="metric-icon icon-blue">
+                <i class="bi bi-list-task"></i>
+            </div>
+        </div>
+    </div>
+    <!-- Open Incidents -->
+    <div class="col-12 col-sm-6 col-md-4 col-xl-2.4" style="flex: 1 1 200px;">
+        <div class="card-metric shadow-sm">
+            <div>
+                <div class="metric-label">Open Incidents</div>
+                <div class="metric-value">{{ open_incidents }}</div>
+            </div>
+            <div class="metric-icon icon-orange">
+                <i class="bi bi-folder2-open"></i>
+            </div>
+        </div>
+    </div>
+    <!-- Critical Incidents -->
+    <div class="col-12 col-sm-6 col-md-4 col-xl-2.4" style="flex: 1 1 200px;">
+        <div class="card-metric shadow-sm">
+            <div>
+                <div class="metric-label">Critical</div>
+                <div class="metric-value">{{ critical_incidents }}</div>
+            </div>
+            <div class="metric-icon icon-red" style="background: #fef2f2; color: #ef4444;">
+                <i class="bi bi-exclamation-octagon"></i>
+            </div>
+        </div>
+    </div>
+    <!-- Pending Approvals -->
+    <div class="col-12 col-sm-6 col-md-4 col-xl-2.4" style="flex: 1 1 200px;">
+        <div class="card-metric shadow-sm">
+            <div>
+                <div class="metric-label">Pending Approvals</div>
+                <div class="metric-value">{{ pending_approvals }}</div>
+            </div>
+            <div class="metric-icon icon-yellow">
+                <i class="bi bi-shield-check"></i>
+            </div>
+        </div>
+    </div>
+    <!-- Resolved Incidents -->
+    <div class="col-12 col-sm-6 col-md-4 col-xl-2.4" style="flex: 1 1 200px;">
+        <div class="card-metric shadow-sm">
+            <div>
+                <div class="metric-label">Resolved</div>
+                <div class="metric-value">{{ resolved_incidents }}</div>
+            </div>
+            <div class="metric-icon icon-green">
+                <i class="bi bi-check-circle"></i>
+            </div>
+        </div>
+    </div>
+    <!-- Active Runbooks -->
+    <div class="col-12 col-sm-6 col-md-4 col-xl-2.4" style="flex: 1 1 200px;">
+        <div class="card-metric shadow-sm">
+            <div>
+                <div class="metric-label">Active Runbooks</div>
+                <div class="metric-value">{{ active_runbooks }}</div>
+            </div>
+            <div class="metric-icon icon-blue">
+                <i class="bi bi-journal-check"></i>
+            </div>
+        </div>
+    </div>
+    <!-- Inactive Runbooks -->
+    <div class="col-12 col-sm-6 col-md-4 col-xl-2.4" style="flex: 1 1 200px;">
+        <div class="card-metric shadow-sm">
+            <div>
+                <div class="metric-label">Inactive Runbooks</div>
+                <div class="metric-value">{{ inactive_runbooks }}</div>
+            </div>
+            <div class="metric-icon text-secondary" style="background: #f3f4f6; color: #4b5563;">
+                <i class="bi bi-journal-x"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Recent System Incidents -->
+    <div class="col-lg-6">
+        <div class="card card-custom shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-semibold"><i class="bi bi-clock-history text-primary me-2"></i>Recent Incidents</h5>
+                {% if recent_incidents %}
+                    <a href="{% url 'admin_incident_list' %}" class="btn btn-sm btn-outline-secondary">View All</a>
+                {% endif %}
+            </div>
+            <div class="card-body p-0">
+                {% if recent_incidents %}
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0" style="font-size: 0.85rem;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="px-3 py-2">Incident</th>
+                                    <th class="py-2">Reporter</th>
+                                    <th class="py-2">Priority</th>
+                                    <th class="py-2">Status</th>
+                                    <th class="px-3 py-2 text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for incident in recent_incidents %}
+                                    <tr class="border-bottom">
+                                        <td class="px-3 py-2 fw-bold">
+                                            <a href="{% url 'admin_incident_detail' incident.pk %}" class="text-primary text-decoration-none">
+                                                {{ incident.incident_number }}
+                                            </a>
+                                            <span class="d-block text-secondary fw-normal small text-truncate" style="max-width: 160px;">{{ incident.title }}</span>
+                                        </td>
+                                        <td class="py-2 text-dark">{{ incident.created_by.username }}</td>
+                                        <td class="py-2">
+                                            <span class="badge-priority bg-priority-{{ incident.priority|lower }}" style="padding: 2px 6px; font-size: 0.65rem;">
+                                                {{ incident.get_priority_display }}
+                                            </span>
+                                        </td>
+                                        <td class="py-2">
+                                            <span class="badge-status status-{{ incident.status|lower }}" style="padding: 2px 6px; font-size: 0.65rem;">
+                                                {{ incident.get_status_display }}
+                                            </span>
+                                        </td>
+                                        <td class="px-3 py-2 text-end">
+                                            <a href="{% url 'admin_incident_detail' incident.pk %}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 0.75rem;">
+                                                View
+                                            </a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="py-5 text-center">
+                        <i class="bi bi-inbox text-muted" style="font-size: 2rem;"></i>
+                        <h6 class="text-secondary mt-3 fw-medium">No incidents reported.</h6>
+                        <p class="text-muted small mb-0">Newly reported incidents will show up here automatically.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Critical Incidents -->
+    <div class="col-lg-6">
+        <div class="card card-custom shadow-sm border-danger-subtle">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-semibold text-danger"><i class="bi bi-exclamation-octagon-fill text-danger me-2"></i>Active Critical Alerts</h5>
+                {% if unresolved_critical %}
+                    <a href="{% url 'admin_critical_incidents' %}" class="btn btn-sm btn-outline-danger">View All</a>
+                {% endif %}
+            </div>
+            <div class="card-body p-0">
+                {% if unresolved_critical %}
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0" style="font-size: 0.85rem;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="px-3 py-2 text-danger">Incident</th>
+                                    <th class="py-2">Reporter</th>
+                                    <th class="py-2">Category</th>
+                                    <th class="py-2">Status</th>
+                                    <th class="px-3 py-2 text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for incident in unresolved_critical %}
+                                    <tr class="border-bottom">
+                                        <td class="px-3 py-2 fw-bold">
+                                            <a href="{% url 'admin_incident_detail' incident.pk %}" class="text-danger text-decoration-none">
+                                                {{ incident.incident_number }}
+                                            </a>
+                                            <span class="d-block text-secondary fw-normal small text-truncate" style="max-width: 160px;">{{ incident.title }}</span>
+                                        </td>
+                                        <td class="py-2 text-dark">{{ incident.created_by.username }}</td>
+                                        <td class="py-2 text-secondary">{{ incident.get_category_display }}</td>
+                                        <td class="py-2">
+                                            <span class="badge-status status-{{ incident.status|lower }}" style="padding: 2px 6px; font-size: 0.65rem;">
+                                                {{ incident.get_status_display }}
+                                            </span>
+                                        </td>
+                                        <td class="px-3 py-2 text-end">
+                                            <a href="{% url 'admin_incident_detail' incident.pk %}" class="btn btn-sm btn-danger py-0 px-2" style="font-size: 0.75rem;">
+                                                Manage
+                                            </a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="py-5 text-center">
+                        <i class="bi bi-shield-check text-success" style="font-size: 2rem;"></i>
+                        <h6 class="text-success mt-3 fw-medium">No active critical incidents.</h6>
+                        <p class="text-muted small mb-0">System performance is within operational parameters.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

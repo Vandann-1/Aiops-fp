@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Incident - {{ incident.incident_number }}{% endblock %}
+{% block page_title %}IT Operations Console{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Main Left Column: Description & Placeholder Modules -->
+    <div class="col-lg-8">
+        <!-- Incident Info Card -->
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-5 fw-bold text-dark">{{ incident.incident_number }}</span>
+                    <span class="badge-status status-{{ incident.status|lower }}">
+                        {{ incident.get_status_display }}
+                    </span>
+                </div>
+                <span class="text-muted small">
+                    <i class="bi bi-clock me-1"></i> Reported: {{ incident.created_at|date:"d M Y • H:i" }}
+                </span>
+            </div>
+            <div class="card-body">
+                <h4 class="fw-bold mb-3">{{ incident.title }}</h4>
+
+                <h6 class="fw-bold text-secondary text-uppercase small mb-2" style="font-size: 0.72rem; letter-spacing: 0.05em;">Problem Description</h6>
+                <div class="p-3 bg-light rounded border mb-4" style="white-space: pre-wrap; font-size: 0.9rem; line-height: 1.6;">{{ incident.description }}</div>
+
+                <div class="row g-3">
+                    <div class="col-sm-6 col-md-4">
+                        <span class="text-secondary small d-block">Category</span>
+                        <strong class="text-dark">{{ incident.get_category_display }}</strong>
+                    </div>
+                    <div class="col-sm-6 col-md-4">
+                        <span class="text-secondary small d-block">Reported Priority</span>
+                        <span class="badge-priority bg-priority-{{ incident.priority|lower }} d-inline-block mt-1">
+                            {{ incident.get_priority_display }}
+                        </span>
+                    </div>
+                    <div class="col-sm-6 col-md-4">
+                        <span class="text-secondary small d-block">Reporter Details</span>
+                        <strong class="text-dark">{{ incident.created_by.username }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Analysis & Runbook Recommendation -->
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-robot text-primary me-2"></i>AI Runbook Recommendation</h5>
+                {% if incident.runbook_recommendation %}
+                    {% if incident.runbook_recommendation.runbook.is_active %}
+                        <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle" style="font-size: 0.7rem;">Recommendation Ready</span>
+                    {% else %}
+                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle" style="font-size: 0.7rem;">Runbook Inactive</span>
+                    {% endif %}
+                {% else %}
+                    <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle" style="font-size: 0.7rem;">No Match</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if incident.runbook_recommendation %}
+                    {% with rec=incident.runbook_recommendation %}
+                        {% if rec.runbook %}
+                            <div class="d-flex justify-content-between align-items-center mb-3 bg-light p-3 rounded border">
+                                <div>
+                                    <span class="badge bg-primary text-white px-2.5 py-1 fw-bold me-2" style="font-size: 0.8rem;">
+                                        {{ rec.runbook.runbook_number }}
+                                    </span>
+                                    <strong class="text-dark">{{ rec.runbook.title }}</strong>
+                                </div>
+                                <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle px-2.5 py-1 fw-semibold" style="font-size: 0.78rem;">
+                                    Match Score: {{ rec.match_score_percentage|floatformat:2 }}%
+                                </span>
+                            </div>
+
+                            {% if not rec.runbook.is_active %}
+                                <div class="alert alert-warning py-2 px-3 small border mb-3">
+                                    <i class="bi bi-exclamation-triangle-fill me-1"></i> Previously recommended runbook is now inactive. Please run analysis again.
+                                </div>
+                            {% endif %}
+
+                            <h6 class="fw-bold text-secondary text-uppercase small mb-2" style="font-size: 0.72rem; letter-spacing: 0.05em;">Description</h6>
+                            <p class="text-secondary small mb-3" style="line-height: 1.5;">{{ rec.runbook.description }}</p>
+
+                            <h6 class="fw-bold text-secondary text-uppercase small mb-2" style="font-size: 0.72rem; letter-spacing: 0.05em;">Indicative Symptoms</h6>
+                            <ul class="small ps-3 text-secondary mb-3">
+                                {% for symptom in rec.runbook.symptoms.splitlines %}
+                                    {% if symptom.strip %}
+                                        <li>{{ symptom }}</li>
+                                    {% endif %}
+                                {% endfor %}
+                            </ul>
+
+                            <h6 class="fw-bold text-secondary text-uppercase small mb-2" style="font-size: 0.72rem; letter-spacing: 0.05em;">Procedure Steps</h6>
+                            <div class="p-3 bg-light rounded border text-secondary mb-4" style="white-space: pre-wrap; font-size: 0.88rem; line-height: 1.6; font-family: inherit;">{{ rec.runbook.steps }}</div>
+                        {% else %}
+                            <div class="py-4 text-center">
+                                <i class="bi bi-exclamation-triangle text-muted mb-2" style="font-size: 2.5rem;"></i>
+                                <h6 class="text-secondary fw-semibold mb-1">No suitable runbook was found for this incident.</h6>
+                                <p class="text-muted small mb-0">The textual similarity score of all active runbooks was below the minimum threshold (20.00%).</p>
+                            </div>
+                        {% endif %}
+                    {% endwith %}
+                {% else %}
+                    <div class="py-4 text-center">
+                        <i class="bi bi-exclamation-triangle text-muted mb-2" style="font-size: 2.5rem;"></i>
+                        <h6 class="text-secondary fw-semibold mb-1">No suitable runbook was found for this incident.</h6>
+                        <p class="text-muted small mb-0">The textual similarity score of all active runbooks was below the minimum threshold (20.00%).</p>
+                    </div>
+                {% endif %}
+
+                <!-- Action Button for Re-analysis -->
+                <div class="border-top pt-3 mt-3 d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">
+                        {% if incident.runbook_recommendation %}
+                            Last analyzed: {{ incident.runbook_recommendation.created_at|date:"d M H:i" }}
+                        {% else %}
+                            Not yet matched successfully.
+                        {% endif %}
+                    </span>
+                    <form method="post" action="{% url 'admin_incident_analyze' incident.pk %}" class="mb-0">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-primary fw-bold px-3">
+                            <i class="bi bi-cpu-fill me-1"></i> Analyze Again
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Automation & Approval Panel -->
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-terminal text-primary me-2"></i>Automation & Approval</h5>
+            </div>
+            <div class="card-body py-4 text-center">
+                {% if incident.runbook_recommendation and incident.runbook_recommendation.runbook %}
+                    <div class="alert alert-secondary py-3 px-4 border mb-0 text-start" role="alert">
+                        <h6 class="alert-heading fw-bold mb-2"><i class="bi bi-exclamation-triangle-fill text-warning me-1"></i> Predefined Automation Available</h6>
+                        <p class="small mb-2">The recommended runbook contains a predefined action hook: <code>{{ incident.runbook_recommendation.runbook.automation_action|default:"None" }}</code>.</p>
+                        <p class="small mb-0 text-muted">Automation execution and human approval controls will become available in Phase 5 and Phase 6.</p>
+                    </div>
+                {% else %}
+                    <i class="bi bi-shield-exclamation text-muted mb-2" style="font-size: 2.5rem;"></i>
+                    <h6 class="text-secondary fw-semibold mb-1">No automation action is available.</h6>
+                    <p class="text-muted small mb-0">Automation routines will be suggested once a runbook is retrieved and recommended.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Operations Panel & Reporter Details & Timelines -->
+    <div class="col-lg-4">
+        <!-- Operations Panel (Update Properties Form) -->
+        <div class="card card-custom shadow-sm mb-4 border-primary-subtle">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 fw-bold text-primary"><i class="bi bi-sliders text-primary me-2"></i>Operations Panel</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'admin_incident_update' incident.pk %}">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="id_priority" class="form-label small fw-semibold text-secondary">Set Priority</label>
+                        {{ form.priority }}
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="id_status" class="form-label small fw-semibold text-secondary">Set Lifecycle Status</label>
+                        {{ form.status }}
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 fw-semibold">
+                        <i class="bi bi-save me-1"></i> Update Properties
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Reporter details Card -->
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-person-circle text-primary me-2"></i>Reporter Information</h5>
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush" style="font-size: 0.88rem;">
+                    <li class="list-group-item py-3">
+                        <span class="text-secondary small d-block">Username</span>
+                        <strong class="text-dark">{{ incident.created_by.username }}</strong>
+                    </li>
+                    <li class="list-group-item py-3">
+                        <span class="text-secondary small d-block">Full Name</span>
+                        <strong class="text-dark">{{ incident.created_by.get_full_name|default:"Not Available" }}</strong>
+                    </li>
+                    <li class="list-group-item py-3">
+                        <span class="text-secondary small d-block">Email Address</span>
+                        <a href="mailto:{{ incident.created_by.email }}" class="text-primary text-decoration-none fw-medium">
+                            {{ incident.created_by.email|default:"No email registered" }}
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Activity Timeline Card -->
+        <div class="card card-custom shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-clock-history text-primary me-2"></i>Activity History</h5>
+            </div>
+            <div class="card-body">
+                {% if activities %}
+                    <ul class="timeline-feed mb-0">
+                        {% for activity in activities %}
+                            <li class="timeline-feed-item {% if forloop.first %}active{% endif %}">
+                                <div class="timeline-time">{{ activity.created_at|date:"d M • H:i" }}</div>
+                                <div class="timeline-desc">{{ activity.description }}</div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted small text-center mb-0">No history logged.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

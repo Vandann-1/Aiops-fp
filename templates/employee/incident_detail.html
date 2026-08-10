@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+
+{% block title %}Incident Details - {{ incident.incident_number }}{% endblock %}
+{% block page_title %}Incident {{ incident.incident_number }}{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Main Left Column -->
+    <div class="col-lg-8">
+        <!-- Incident Info Card -->
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-dark">{{ incident.title }}</h5>
+                <span class="badge-status status-{{ incident.status|lower }}">
+                    {{ incident.get_status_display }}
+                </span>
+            </div>
+            <div class="card-body">
+                <span class="text-muted small d-block mb-3">
+                    <i class="bi bi-clock me-1"></i> Reported on {{ incident.created_at|date:"d M Y • H:i" }}
+                    {% if incident.resolved_at %}
+                        • <i class="bi bi-check-circle-fill text-success ms-2 me-1"></i> Resolved on {{ incident.resolved_at|date:"d M Y • H:i" }}
+                    {% endif %}
+                </span>
+
+                <h6 class="fw-bold text-secondary text-uppercase small mb-2" style="font-size: 0.72rem; letter-spacing: 0.05em;">Problem Description</h6>
+                <div class="p-3 bg-light rounded border mb-4" style="white-space: pre-wrap; font-size: 0.9rem; line-height: 1.6;">{{ incident.description }}</div>
+
+                <!-- Progress Tracker Stepper -->
+                <h6 class="fw-bold text-secondary text-uppercase small mb-3" style="font-size: 0.72rem; letter-spacing: 0.05em;">Lifecycle Progress</h6>
+                <ul class="progress-stepper">
+                    <!-- Step 1: Reported -->
+                    <li class="progress-step-item completed">
+                        <div class="progress-step-circle">
+                            <i class="bi bi-check-lg"></i>
+                        </div>
+                        <div class="progress-step-label">Incident Reported</div>
+                    </li>
+                    <!-- Step 2: Analysis -->
+                    <li class="progress-step-item {% if incident.status != 'OPEN' and incident.status != 'ANALYZING' %}completed{% elif incident.status == 'ANALYZING' %}active{% endif %}">
+                        <div class="progress-step-circle">
+                            {% if incident.status != 'OPEN' and incident.status != 'ANALYZING' %}<i class="bi bi-check-lg"></i>{% else %}2{% endif %}
+                        </div>
+                        <div class="progress-step-label">Analysis</div>
+                    </li>
+                    <!-- Step 3: Recommendation -->
+                    <li class="progress-step-item {% if incident.status not in 'OPEN,ANALYZING,RECOMMENDATION_READY' %}completed{% elif incident.status == 'RECOMMENDATION_READY' %}active{% endif %}">
+                        <div class="progress-step-circle">
+                            {% if incident.status not in 'OPEN,ANALYZING,RECOMMENDATION_READY' %}<i class="bi bi-check-lg"></i>{% else %}3{% endif %}
+                        </div>
+                        <div class="progress-step-label">Recommendation</div>
+                    </li>
+                    <!-- Step 4: Approval -->
+                    <li class="progress-step-item {% if incident.status in 'IN_PROGRESS,RESOLVED,FAILED,REJECTED' %}completed{% elif incident.status in 'PENDING_APPROVAL,APPROVED' %}active{% endif %}">
+                        <div class="progress-step-circle">
+                            {% if incident.status in 'IN_PROGRESS,RESOLVED,FAILED,REJECTED' %}<i class="bi bi-check-lg"></i>{% else %}4{% endif %}
+                        </div>
+                        <div class="progress-step-label">Approval</div>
+                    </li>
+                    <!-- Step 5: Resolution -->
+                    <li class="progress-step-item {% if incident.status in 'RESOLVED,FAILED,REJECTED' %}completed{% elif incident.status == 'IN_PROGRESS' %}active{% endif %}">
+                        <div class="progress-step-circle">
+                            {% if incident.status in 'RESOLVED,FAILED,REJECTED' %}<i class="bi bi-check-lg"></i>{% else %}5{% endif %}
+                        </div>
+                        <div class="progress-step-label">Resolution</div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- AI Analysis Section -->
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-robot text-primary me-2"></i>AI Runbook Recommendation</h5>
+            </div>
+            <div class="card-body">
+                {% if incident.runbook_recommendation %}
+                    {% with rec=incident.runbook_recommendation %}
+                        {% if rec.runbook %}
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 fw-bold" style="font-size: 0.8rem;">
+                                        {{ rec.runbook.runbook_number }}
+                                    </span>
+                                    <h6 class="fw-bold text-dark mb-0">{{ rec.runbook.title }}</h6>
+                                </div>
+                                <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle px-2.5 py-1" style="font-size: 0.78rem;">
+                                    Match Score: {{ rec.match_score_percentage|floatformat:2 }}%
+                                </span>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-0.5 small mb-2">Category: {{ rec.runbook.get_category_display }}</span>
+                                <div class="text-secondary small mt-1" style="line-height: 1.5;">{{ rec.runbook.description }}</div>
+                            </div>
+
+                            {% if not rec.runbook.is_active %}
+                                <div class="alert alert-secondary py-2 px-3 small border mb-3">
+                                    <i class="bi bi-slash-circle me-1"></i> Previously recommended runbook is now inactive.
+                                </div>
+                            {% endif %}
+
+                            <!-- Procedural View Toggle Collapse -->
+                            <div class="border-top pt-3 mt-3">
+                                <button class="btn btn-sm btn-outline-primary fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseProcedure" aria-expanded="false" aria-controls="collapseProcedure">
+                                    <i class="bi bi-file-text me-1"></i> View Troubleshooting Procedure
+                                </button>
+                                
+                                <div class="collapse mt-3" id="collapseProcedure">
+                                    <div class="p-3 bg-light rounded border">
+                                        <h6 class="fw-bold text-secondary text-uppercase small mb-2" style="font-size: 0.72rem; letter-spacing: 0.05em;">Indicative Symptoms</h6>
+                                        <ul class="small mb-3 ps-3 text-secondary">
+                                            {% for symptom in rec.runbook.symptoms.splitlines %}
+                                                {% if symptom.strip %}
+                                                    <li>{{ symptom }}</li>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </ul>
+                                        
+                                        <h6 class="fw-bold text-secondary text-uppercase small mb-2" style="font-size: 0.72rem; letter-spacing: 0.05em;">Resolution Steps</h6>
+                                        <div class="small text-secondary" style="white-space: pre-wrap; font-family: inherit; line-height: 1.6;">{{ rec.runbook.steps }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="py-3 text-center">
+                                <i class="bi bi-exclamation-triangle text-muted fs-3 d-block mb-2"></i>
+                                <h6 class="text-secondary fw-semibold">No suitable runbook was found for this incident.</h6>
+                                <p class="text-muted small mb-0">An IT administrator may need to investigate the issue manually.</p>
+                            </div>
+                        {% endif %}
+                    {% endwith %}
+                {% else %}
+                    <div class="py-3 text-center">
+                        <i class="bi bi-exclamation-triangle text-muted fs-3 d-block mb-2"></i>
+                        <h6 class="text-secondary fw-semibold">No suitable runbook was found for this incident.</h6>
+                        <p class="text-muted small mb-0">An IT administrator may need to investigate the issue manually.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Metadata & Activity -->
+    <div class="col-lg-4">
+        <!-- Metadata Summary Card -->
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-info-circle text-primary me-2"></i>Incident Properties</h5>
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush" style="font-size: 0.88rem;">
+                    <li class="list-group-item d-flex justify-content-between py-3">
+                        <span class="text-secondary fw-semibold">Category</span>
+                        <span class="text-dark fw-medium">{{ incident.get_category_display }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between py-3">
+                        <span class="text-secondary fw-semibold">Priority</span>
+                        <span class="badge-priority bg-priority-{{ incident.priority|lower }}">
+                            {{ incident.get_priority_display }}
+                        </span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between py-3">
+                        <span class="text-secondary fw-semibold">Status</span>
+                        <span class="badge-status status-{{ incident.status|lower }} py-1">
+                            {{ incident.get_status_display }}
+                        </span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between py-3">
+                        <span class="text-secondary fw-semibold">Last Updated</span>
+                        <span class="text-muted small">{{ incident.updated_at|date:"d M Y • H:i" }}</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Activity Timeline Card -->
+        <div class="card card-custom shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-clock-history text-primary me-2"></i>Activity History</h5>
+            </div>
+            <div class="card-body">
+                {% if activities %}
+                    <ul class="timeline-feed mb-0">
+                        {% for activity in activities %}
+                            <li class="timeline-feed-item {% if forloop.first %}active{% endif %}">
+                                <div class="timeline-time">{{ activity.created_at|date:"d M • H:i" }}</div>
+                                <div class="timeline-desc">{{ activity.description }}</div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted small text-center mb-0">No history available.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
