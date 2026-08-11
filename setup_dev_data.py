@@ -39,8 +39,9 @@ def run():
         print(f"   [INFO] Superuser '{admin_username}' verified.")
 
     # 2. Create Employee user
-    employee_username = 'employee'
-    employee_password = 'employee1234'
+    #i  this is my pss
+    employee_username = 'employeee'
+    employee_password = 'employeee1234'
     if not User.objects.filter(username=employee_username).exists():
         employee = User.objects.create_user(
             username=employee_username,
