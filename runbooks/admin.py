@@ -34,6 +34,7 @@ class RunbookRecommendationAdmin(admin.ModelAdmin):
         'incident',
         'runbook',
         'match_score',
+        'retrieval_method',
         'created_at'
     )
     list_filter = (

@@ -97,7 +97,7 @@ class RunbookRecommendation(models.Model):
     match_score = models.FloatField(
         help_text="Semantic matching similarity score"
     )
-    retrieval_engine = models.CharField(
+    retrieval_method = models.CharField(
         max_length=50,
         default='tfidf',
         help_text="Algorithm identifier used to generate match scores"

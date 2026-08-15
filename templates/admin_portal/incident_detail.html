@@ -95,6 +95,24 @@
 
                             <h6 class="fw-bold text-secondary text-uppercase small mb-2" style="font-size: 0.72rem; letter-spacing: 0.05em;">Procedure Steps</h6>
                             <div class="p-3 bg-light rounded border text-secondary mb-4" style="white-space: pre-wrap; font-size: 0.88rem; line-height: 1.6; font-family: inherit;">{{ rec.runbook.steps }}</div>
+
+                            <div class="row g-3 mb-3 border-top pt-3">
+                                <div class="col-sm-6">
+                                    <h6 class="fw-bold text-secondary text-uppercase small mb-1" style="font-size: 0.72rem; letter-spacing: 0.05em;">Risk Level</h6>
+                                    <span class="badge bg-secondary-subtle text-dark border px-2.5 py-1 fw-bold" style="font-size: 0.8rem;">
+                                        {{ rec.runbook.get_risk_level_display }}
+                                    </span>
+                                </div>
+                                <div class="col-sm-6">
+                                    <h6 class="fw-bold text-secondary text-uppercase small mb-1" style="font-size: 0.72rem; letter-spacing: 0.05em;">Automation Action</h6>
+                                    <code class="text-dark bg-light px-2.5 py-1 rounded border d-inline-block" style="font-size: 0.8rem;">
+                                        {{ rec.runbook.automation_action|default:"None" }}
+                                    </code>
+                                    <div class="text-danger small mt-1.5 fw-semibold">
+                                        <i class="bi bi-slash-circle me-1"></i> Automation is not available in Phase 4.
+                                    </div>
+                                </div>
+                            </div>
                         {% else %}
                             <div class="py-4 text-center">
                                 <i class="bi bi-exclamation-triangle text-muted mb-2" style="font-size: 2.5rem;"></i>

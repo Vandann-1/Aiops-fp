@@ -34,20 +34,17 @@ def retrieve_best_runbook(incident):
         # 2. Build incident search text (combining title, description, category)
         incident_text = f"{incident.title} {incident.description} {incident.category}"
 
-        # 3. Build runbook corpus texts
-        # WEIGHTING ALGORITHM:
-        # Title and Symptoms are the key indicators of what a runbook resolves.
-        # Repeating title 3 times and symptoms 2 times gives them significantly higher weight than the description body.
+        # 3. Build runbook corpus texts using title, description, symptoms, and category
         runbook_texts = []
         for rb in active_runbooks:
-            weighted_text = f"{rb.title} {rb.title} {rb.title} {rb.symptoms} {rb.symptoms} {rb.description}"
-            runbook_texts.append(weighted_text)
+            combined_text = f"{rb.title} {rb.description} {rb.symptoms} {rb.category}"
+            runbook_texts.append(combined_text)
 
         # 4. Construct the corpus by appending the incident text to the runbook texts
         corpus = runbook_texts + [incident_text]
 
         # 5. Fit TfidfVectorizer on the complete corpus
-        vectorizer = TfidfVectorizer(stop_words='english')
+        vectorizer = TfidfVectorizer(lowercase=True, stop_words='english')
         tfidf_matrix = vectorizer.fit_transform(corpus)
 
         # 6. Extract vectors: 

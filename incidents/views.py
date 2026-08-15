@@ -98,7 +98,7 @@ def employee_incident_create(request):
                         defaults={
                             'runbook': best_runbook,
                             'match_score': best_score,
-                            'retrieval_engine': 'tfidf'
+                            'retrieval_method': 'tfidf'
                         }
                     )
                     incident.status = Incident.Status.RECOMMENDATION_READY
@@ -359,7 +359,7 @@ def admin_incident_analyze(request, pk):
                 defaults={
                     'runbook': best_runbook,
                     'match_score': best_score,
-                    'retrieval_engine': 'tfidf'
+                    'retrieval_method': 'tfidf'
                 }
             )
             incident.status = Incident.Status.RECOMMENDATION_READY
