@@ -80,10 +80,9 @@
                     </li>
                     
                     <li class="sidebar-section-header text-secondary small px-3 mt-3 mb-1 fw-bold text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.05em;">Operations</li>
-                    <li class="disabled-nav-item">
-                        <a href="#" class="text-muted d-flex align-items-center justify-content-between" style="cursor: not-allowed; opacity: 0.65;">
-                            <span><i class="bi bi-shield-check me-2"></i> Pending Approvals</span>
-                            <span class="badge bg-secondary" style="font-size: 0.6rem;">Soon</span>
+                    <li class="{% if request.resolver_match.url_name == 'approval_list' or request.resolver_match.url_name == 'approval_detail' %}active{% endif %}">
+                        <a href="{% url 'approval_list' %}">
+                            <i class="bi bi-shield-check"></i> Pending Approvals
                         </a>
                     </li>
                     <li class="disabled-nav-item">

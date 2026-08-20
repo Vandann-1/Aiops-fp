@@ -100,6 +100,23 @@
                                 </div>
                             {% endif %}
 
+                            {% if incident.status == 'PENDING_APPROVAL' %}
+                                <div class="alert alert-warning py-3 px-4 border mb-3 text-start" role="alert">
+                                    <h6 class="alert-heading fw-bold mb-1"><i class="bi bi-clock-history me-1"></i> Human Approval Required</h6>
+                                    <p class="small mb-0 text-muted">An IT administrator is reviewing the recommended action.</p>
+                                </div>
+                            {% elif incident.status == 'APPROVED' %}
+                                <div class="alert alert-success py-3 px-4 border mb-3 text-start" role="alert">
+                                    <h6 class="alert-heading fw-bold mb-1"><i class="bi bi-check-circle-fill me-1"></i> Action Approved</h6>
+                                    <p class="small mb-0 text-muted">An IT administrator approved the recommended action. Execution has not yet occurred.</p>
+                                </div>
+                            {% elif incident.status == 'REJECTED' %}
+                                <div class="alert alert-danger py-3 px-4 border mb-3 text-start" role="alert">
+                                    <h6 class="alert-heading fw-bold mb-1"><i class="bi bi-x-circle-fill me-1"></i> Action Rejected</h6>
+                                    <p class="small mb-0 text-muted">An IT administrator rejected the recommended action.</p>
+                                </div>
+                            {% endif %}
+
                             <!-- Procedural View Toggle Collapse -->
                             <div class="border-top pt-3 mt-3">
                                 <button class="btn btn-sm btn-outline-primary fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseProcedure" aria-expanded="false" aria-controls="collapseProcedure">

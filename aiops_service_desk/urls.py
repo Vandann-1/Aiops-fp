@@ -22,5 +22,5 @@ urlpatterns = [
     path('', include('accounts.urls')),
     path('', include('incidents.urls')),
     path('', include('runbooks.urls')),
-    path('automation/', include('automation.urls')),
+    path('', include('automation.urls')),
 ]

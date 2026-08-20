@@ -1,8 +1,95 @@
 {% extends "base.html" %}
 
-{% block title %}Pending Approvals - AIOps Service Desk{% endblock %}
+{% block title %}Human Approvals Console - AIOps Service Desk{% endblock %}
+{% block page_title %}Human Approvals Console{% endblock %}
 
 {% block content %}
-<h2>Pending Approvals</h2>
-<p>Placeholder for the Pending Approvals list page.</p>
+<div class="card card-custom shadow-sm mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-shield-check text-primary me-2"></i>Human Approval Requests</h5>
+        <div class="btn-group btn-group-sm" role="group" aria-label="Approval Filter">
+            <a href="?status=pending" class="btn btn-outline-primary {% if status_filter == 'PENDING' %}active{% endif %}">Pending</a>
+            <a href="?status=approved" class="btn btn-outline-primary {% if status_filter == 'APPROVED' %}active{% endif %}">Approved</a>
+            <a href="?status=rejected" class="btn btn-outline-primary {% if status_filter == 'REJECTED' %}active{% endif %}">Rejected</a>
+            <a href="?status=all" class="btn btn-outline-primary {% if status_filter == 'ALL' %}active{% endif %}">All Requests</a>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        {% if approvals %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" style="font-size: 0.9rem;">
+                    <thead class="table-light text-secondary fw-semibold" style="font-size: 0.8rem; text-uppercase: uppercase; letter-spacing: 0.05em;">
+                        <tr>
+                            <th class="ps-4 py-3">Incident</th>
+                            <th class="py-3">Runbook Procedure</th>
+                            <th class="py-3 text-center">Match Score</th>
+                            <th class="py-3">Risk Level</th>
+                            <th class="py-3">Requested By</th>
+                            <th class="py-3">Created</th>
+                            <th class="py-3 text-center">Status</th>
+                            <th class="pe-4 py-3 text-end">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for app in approvals %}
+                            <tr>
+                                <td class="ps-4 py-3 fw-bold text-dark">
+                                    <a href="{% url 'admin_incident_detail' app.incident.pk %}" class="text-primary text-decoration-none">
+                                        {{ app.incident.incident_number }}
+                                    </a>
+                                </td>
+                                <td class="py-3 text-dark fw-medium">
+                                    <div class="d-flex align-items-center gap-1.5">
+                                        <span class="badge bg-secondary-subtle text-secondary-emphasis border px-2 py-0.5 small" style="font-size: 0.72rem;">
+                                            {{ app.runbook.runbook_number }}
+                                        </span>
+                                        <span>{{ app.runbook.title }}</span>
+                                    </div>
+                                </td>
+                                <td class="py-3 text-center text-secondary">
+                                    {% if app.incident.runbook_recommendation %}
+                                        {{ app.incident.runbook_recommendation.match_score_percentage|floatformat:2 }}%
+                                    {% else %}
+                                        --
+                                    {% endif %}
+                                </td>
+                                <td class="py-3">
+                                    <span class="badge bg-priority-{{ app.runbook.risk_level|lower }}">
+                                        {{ app.runbook.get_risk_level_display }}
+                                    </span>
+                                </td>
+                                <td class="py-3 text-secondary small">
+                                    {{ app.requested_by.username }}
+                                </td>
+                                <td class="py-3 text-secondary small">
+                                    {{ app.created_at|date:"d M Y • H:i" }}
+                                </td>
+                                <td class="py-3 text-center">
+                                    {% if app.status == 'PENDING' %}
+                                        <span class="badge bg-warning text-dark border border-warning px-2.5 py-1">Pending</span>
+                                    {% elif app.status == 'APPROVED' %}
+                                        <span class="badge bg-success text-white border border-success px-2.5 py-1">Approved</span>
+                                    {% elif app.status == 'REJECTED' %}
+                                        <span class="badge bg-danger text-white border border-danger px-2.5 py-1">Rejected</span>
+                                    {% endif %}
+                                </td>
+                                <td class="pe-4 py-3 text-end">
+                                    <a href="{% url 'approval_detail' app.pk %}" class="btn btn-sm btn-outline-primary fw-semibold px-3">
+                                        Review
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="py-5 text-center">
+                <i class="bi bi-shield-check text-muted mb-2" style="font-size: 3rem;"></i>
+                <h6 class="text-secondary fw-semibold">No approval requests found.</h6>
+                <p class="text-muted small mb-0">No entries exist under the selected status filter: <strong>{{ status_filter }}</strong>.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
 {% endblock %}

@@ -1,8 +1,197 @@
 {% extends "base.html" %}
 
-{% block title %}Approval Operations - AIOps Service Desk{% endblock %}
+{% block title %}Review Approval Request - AIOps Service Desk{% endblock %}
+{% block page_title %}Human Review Panel{% endblock %}
 
 {% block content %}
-<h2>Approval Operations</h2>
-<p>Placeholder for the Approval Operations page.</p>
+<div class="row g-4">
+    <!-- Left Column: Incident & Recommendation Metadata -->
+    <div class="col-lg-8">
+        <!-- Human-in-the-Loop Warning Banner -->
+        <div class="alert alert-warning py-3 px-4 border mb-4 shadow-sm" role="alert">
+            <h6 class="alert-heading fw-bold mb-2"><i class="bi bi-info-circle-fill text-warning me-1"></i> Human-in-the-Loop Verification Required</h6>
+            <ul class="small mb-0 ps-3 text-secondary" style="line-height: 1.6;">
+                <li><strong>AI recommendations require human approval before any automation can be performed.</strong></li>
+                <li><strong>Approval does not execute the action.</strong> Actual automation runs are managed sequentially in subsequent workflow phases.</li>
+            </ul>
+        </div>
+
+        <!-- Incident Information -->
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-5 fw-bold text-dark">Incident Details</span>
+                    <span class="badge bg-secondary-subtle text-dark border px-2 py-0.5 text-uppercase" style="font-size: 0.72rem;">
+                        {{ approval.incident.incident_number }}
+                    </span>
+                </div>
+                <span class="badge-status status-{{ approval.incident.status|lower }}">
+                    {{ approval.incident.get_status_display }}
+                </span>
+            </div>
+            <div class="card-body">
+                <h5 class="fw-bold text-dark mb-3">{{ approval.incident.title }}</h5>
+                <h6 class="fw-bold text-secondary text-uppercase small mb-2" style="font-size: 0.72rem; letter-spacing: 0.05em;">Description</h6>
+                <div class="p-3 bg-light rounded border mb-0 text-secondary" style="white-space: pre-wrap; font-size: 0.9rem; line-height: 1.6;">{{ approval.incident.description }}</div>
+            </div>
+        </div>
+
+        <!-- Recommended Runbook Information -->
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-robot text-primary me-2"></i>Proposed AI Runbook Recommendation</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-4 bg-light p-3 rounded border">
+                    <div>
+                        <span class="badge bg-primary text-white px-2.5 py-1 fw-bold me-2" style="font-size: 0.8rem;">
+                            {{ approval.runbook.runbook_number }}
+                        </span>
+                        <strong class="text-dark">{{ approval.runbook.title }}</strong>
+                    </div>
+                    <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle px-2.5 py-1 fw-semibold" style="font-size: 0.78rem;">
+                        Match Score: 
+                        {% if approval.incident.runbook_recommendation %}
+                            {{ approval.incident.runbook_recommendation.match_score_percentage|floatformat:2 }}%
+                        {% else %}
+                            --
+                        {% endif %}
+                    </span>
+                </div>
+
+                <h6 class="fw-bold text-secondary text-uppercase small mb-2" style="font-size: 0.72rem; letter-spacing: 0.05em;">Description</h6>
+                <p class="text-secondary small mb-4" style="line-height: 1.5;">{{ approval.runbook.description }}</p>
+
+                <h6 class="fw-bold text-secondary text-uppercase small mb-2" style="font-size: 0.72rem; letter-spacing: 0.05em;">Indicative Symptoms</h6>
+                <ul class="small ps-3 text-secondary mb-4">
+                    {% for symptom in approval.runbook.symptoms.splitlines %}
+                        {% if symptom.strip %}
+                            <li>{{ symptom }}</li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+
+                <h6 class="fw-bold text-secondary text-uppercase small mb-2" style="font-size: 0.72rem; letter-spacing: 0.05em;">Procedure Steps</h6>
+                <div class="p-3 bg-light rounded border text-secondary mb-0" style="white-space: pre-wrap; font-size: 0.88rem; line-height: 1.6; font-family: inherit;">{{ approval.runbook.steps }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Request Meta & Human Decisions -->
+    <div class="col-lg-4">
+        <!-- Request Status Card -->
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-info-circle text-primary me-2"></i>Request Summary</h5>
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush" style="font-size: 0.88rem;">
+                    <li class="list-group-item d-flex justify-content-between py-3">
+                        <span class="text-secondary fw-semibold">Approval ID</span>
+                        <strong class="text-dark">#{{ approval.id }}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between py-3">
+                        <span class="text-secondary fw-semibold">Status</span>
+                        {% if approval.status == 'PENDING' %}
+                            <span class="badge bg-warning text-dark border border-warning">Pending</span>
+                        {% elif approval.status == 'APPROVED' %}
+                            <span class="badge bg-success text-white border border-success">Approved</span>
+                        {% elif approval.status == 'REJECTED' %}
+                            <span class="badge bg-danger text-white border border-danger">Rejected</span>
+                        {% endif %}
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between py-3">
+                        <span class="text-secondary fw-semibold">Risk Level</span>
+                        <span class="badge bg-secondary-subtle text-dark border">{{ approval.runbook.get_risk_level_display }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between py-3">
+                        <span class="text-secondary fw-semibold">Script Hook</span>
+                        <code class="text-dark bg-light px-2 py-0.5 rounded border">{{ approval.runbook.automation_action|default:"None" }}</code>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between py-3">
+                        <span class="text-secondary fw-semibold">Requested By</span>
+                        <span class="text-dark fw-medium">{{ approval.requested_by.username }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between py-3">
+                        <span class="text-secondary fw-semibold">Requested At</span>
+                        <span class="text-muted small">{{ approval.created_at|date:"d M Y • H:i" }}</span>
+                    </li>
+                    {% if approval.reviewed_by %}
+                        <li class="list-group-item d-flex justify-content-between py-3">
+                            <span class="text-secondary fw-semibold">Reviewed By</span>
+                            <span class="text-dark fw-medium">{{ approval.reviewed_by.username }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between py-3">
+                            <span class="text-secondary fw-semibold">Reviewed At</span>
+                            <span class="text-muted small">{{ approval.reviewed_at|date:"d M Y • H:i" }}</span>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+
+        <!-- Human Loop Actions Panel -->
+        <div class="card card-custom shadow-sm mb-4 border-primary-subtle">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 fw-bold text-primary"><i class="bi bi-hand-index-thumb text-primary me-2"></i>Review Operations</h5>
+            </div>
+            <div class="card-body">
+                {% if approval.status == 'PENDING' %}
+                    {% if is_recommendation_mismatched %}
+                        <div class="alert alert-danger py-2 px-3 small border mb-3">
+                            <i class="bi bi-exclamation-octagon-fill me-1"></i> A newer AI analysis recommendation has been run and no longer matches this request. Approving is disabled.
+                        </div>
+                    {% elif not approval.runbook.is_active %}
+                        <div class="alert alert-warning py-2 px-3 small border mb-3">
+                            <i class="bi bi-slash-circle me-1"></i> Recommended runbook is now inactive. Approving is disabled.
+                        </div>
+                    {% endif %}
+
+                    <!-- Approve Action -->
+                    <form method="post" action="{% url 'approve_action' approval.pk %}" class="mb-4">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="approve_reason" class="form-label small fw-semibold text-secondary">Optional Approval Notes</label>
+                            <textarea name="reason" id="approve_reason" class="form-control form-control-sm" rows="2" placeholder="Enter notes or guidelines (optional)"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100 fw-semibold" 
+                            {% if is_recommendation_mismatched or not approval.runbook.is_active %}disabled{% endif %}>
+                            <i class="bi bi-check-circle me-1"></i> Approve Action
+                        </button>
+                    </form>
+
+                    <hr class="my-4 text-muted">
+
+                    <!-- Reject Action -->
+                    <form method="post" action="{% url 'reject_action' approval.pk %}" class="mb-0">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="reject_reason" class="form-label small fw-semibold text-secondary">Rejection Reason <span class="text-danger">*</span></label>
+                            <textarea name="reason" id="reject_reason" class="form-control form-control-sm" rows="3" placeholder="Explain why the recommended procedure is not appropriate (required)" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-danger w-100 fw-semibold">
+                            <i class="bi bi-x-circle me-1"></i> Reject Action
+                        </button>
+                    </form>
+                {% elif approval.status == 'APPROVED' %}
+                    <div class="alert alert-success py-3 px-4 border mb-0 text-start" role="alert">
+                        <h6 class="alert-heading fw-bold mb-2"><i class="bi bi-check-circle-fill me-1"></i> Request Approved</h6>
+                        <p class="small mb-2"><strong>Approved By:</strong> {{ approval.reviewed_by.username }}</p>
+                        {% if approval.reason %}
+                            <p class="small mb-2"><strong>Notes:</strong> {{ approval.reason }}</p>
+                        {% endif %}
+                        <p class="small mb-0 text-muted">Action approved. Automation execution will be handled by the next phase.</p>
+                    </div>
+                {% elif approval.status == 'REJECTED' %}
+                    <div class="alert alert-danger py-3 px-4 border mb-0 text-start" role="alert">
+                        <h6 class="alert-heading fw-bold mb-2"><i class="bi bi-x-circle-fill me-1"></i> Request Rejected</h6>
+                        <p class="small mb-2"><strong>Rejected By:</strong> {{ approval.reviewed_by.username }}</p>
+                        <p class="small mb-2"><strong>Reason:</strong> {{ approval.reason }}</p>
+                        <p class="small mb-0 text-muted">Automation was not approved. Manual investigation may be required.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
