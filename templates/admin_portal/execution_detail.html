@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Automation Execution Log #{{ execution.id }} - AIOps Service Desk{% endblock %}
+{% block page_title %}Automation Execution Log{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Left Column: Output & Logs -->
+    <div class="col-lg-8">
+        <!-- Automation Execution Card -->
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-cpu text-primary me-2"></i>AUTOMATION EXECUTION</h5>
+            </div>
+            <div class="card-body py-3" style="font-size: 0.9rem;">
+                <div class="row mb-2">
+                    <div class="col-sm-4 text-secondary fw-semibold">Action:</div>
+                    <div class="col-sm-8"><code class="text-dark bg-light px-1.5 py-0.5 rounded border">{{ execution.action_name }}</code></div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-sm-4 text-secondary fw-semibold">Mode:</div>
+                    <div class="col-sm-8"><span class="badge bg-secondary-subtle text-dark border px-2 py-0.5">Simulation</span></div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-sm-4 text-secondary fw-semibold">Status:</div>
+                    <div class="col-sm-8">
+                        {% if execution.status == 'SUCCESS' %}
+                            <span class="badge bg-success">SUCCESS</span>
+                        {% elif execution.status == 'FAILED' %}
+                            <span class="badge bg-danger">FAILED</span>
+                        {% elif execution.status == 'BLOCKED' %}
+                            <span class="badge bg-secondary text-dark border">BLOCKED</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark">{{ execution.status }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% if execution.output %}
+                <div class="row mb-2">
+                    <div class="col-sm-4 text-secondary fw-semibold">Output:</div>
+                    <div class="col-sm-8 text-secondary">{{ execution.output }}</div>
+                </div>
+                {% endif %}
+                {% if execution.error_message %}
+                <div class="row mb-2">
+                    <div class="col-sm-4 text-secondary fw-semibold">Error:</div>
+                    <div class="col-sm-8 text-danger">{{ execution.error_message }}</div>
+                </div>
+                {% endif %}
+                <div class="row mb-2">
+                    <div class="col-sm-4 text-secondary fw-semibold">Started:</div>
+                    <div class="col-sm-8 text-muted small">{{ execution.started_at|date:"d M Y H:i"|default:"--" }}</div>
+                </div>
+                <div class="row mb-0">
+                    <div class="col-sm-4 text-secondary fw-semibold">Completed:</div>
+                    <div class="col-sm-8 text-muted small">{{ execution.completed_at|date:"d M Y H:i"|default:"--" }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Execution Status (Console Style Logs) -->
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-dark">
+                    <i class="bi bi-terminal text-primary me-2"></i>Execution Logs
+                </h5>
+                <div>
+                    {% if execution.status == 'SUCCESS' %}
+                        <span class="badge bg-success px-3 py-1.5 fs-7 border border-success">SUCCESS</span>
+                    {% elif execution.status == 'FAILED' %}
+                        <span class="badge bg-danger px-3 py-1.5 fs-7 border border-danger">FAILED</span>
+                    {% elif execution.status == 'BLOCKED' %}
+                        <span class="badge bg-secondary px-3 py-1.5 fs-7 border border-secondary text-dark">BLOCKED</span>
+                    {% elif execution.status == 'RUNNING' %}
+                        <span class="badge bg-primary px-3 py-1.5 fs-7 border border-primary">RUNNING</span>
+                    {% else %}
+                        <span class="badge bg-warning text-dark px-3 py-1.5 fs-7 border border-warning">PENDING</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                {% if execution.error_message %}
+                    <div class="alert alert-danger py-3 px-4 border mb-4" role="alert">
+                        <h6 class="alert-heading fw-bold mb-1"><i class="bi bi-exclamation-octagon-fill me-1"></i> Execution Failure / Block Reason</h6>
+                        <p class="small mb-0">{{ execution.error_message }}</p>
+                    </div>
+                {% endif %}
+
+                <h6 class="fw-bold text-secondary text-uppercase small mb-2" style="font-size: 0.72rem; letter-spacing: 0.05em;">Standard Output (stdout)</h6>
+                <div class="bg-dark text-light p-3 rounded border font-monospace small mb-0" style="white-space: pre-wrap; line-height: 1.6;">
+                    {% if execution.output %}
+{{ execution.output }}
+                    {% else %}
+[No standard output was written by the mock executor]
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Warning Notice -->
+        <div class="alert alert-light py-3 px-4 border shadow-sm text-secondary" role="alert" style="font-size: 0.85rem;">
+            <i class="bi bi-info-circle-fill text-primary me-1"></i>
+            <strong>Security Architecture:</strong> This action was executed inside a strict python registry wrapper using controlled mock parameters. Direct OS/shell interactions were fully sandboxed to prevent command injection risks.
+        </div>
+    </div>
+
+    <!-- Right Column: Meta Details -->
+    <div class="col-lg-4">
+        <!-- Metadata Summary -->
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-info-circle text-primary me-2"></i>Execution Details</h5>
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush" style="font-size: 0.88rem;">
+                    <li class="list-group-item d-flex justify-content-between py-3">
+                        <span class="text-secondary fw-semibold">Incident Link</span>
+                        <a href="{% url 'admin_incident_detail' execution.approval.incident.pk %}" class="fw-bold text-primary text-decoration-none">
+                            {{ execution.approval.incident.incident_number }}
+                        </a>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between py-3">
+                        <span class="text-secondary fw-semibold">Approval ID</span>
+                        <a href="{% url 'approval_detail' execution.approval.pk %}" class="fw-medium text-primary text-decoration-none">
+                            #{{ execution.approval.id }}
+                        </a>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between py-3">
+                        <span class="text-secondary fw-semibold">Runbook Procedure</span>
+                        <span class="text-dark fw-medium text-end">{{ execution.approval.runbook.runbook_number }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between py-3">
+                        <span class="text-secondary fw-semibold">Predefined Action</span>
+                        <code class="text-dark bg-light px-2 py-0.5 rounded border">{{ execution.action_name }}</code>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between py-3">
+                        <span class="text-secondary fw-semibold">Started At</span>
+                        <span class="text-muted small">{{ execution.started_at|date:"d M Y • H:i:s"|default:"--" }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between py-3">
+                        <span class="text-secondary fw-semibold">Completed At</span>
+                        <span class="text-muted small">{{ execution.completed_at|date:"d M Y • H:i:s"|default:"--" }}</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

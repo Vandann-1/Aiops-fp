@@ -129,14 +129,17 @@
                 </ul>
             </div>
         </div>
-
-        <!-- Human Loop Actions Panel -->
         <div class="card card-custom shadow-sm mb-4 border-primary-subtle">
             <div class="card-header bg-white border-bottom">
                 <h5 class="mb-0 fw-bold text-primary"><i class="bi bi-hand-index-thumb text-primary me-2"></i>Review Operations</h5>
             </div>
             <div class="card-body">
                 {% if approval.status == 'PENDING' %}
+                    <div class="alert alert-info py-2 px-3 small border mb-3">
+                        <strong>Approval Status:</strong> PENDING<br>
+                        <strong>Message:</strong> Human approval is required before automation can be executed.
+                    </div>
+
                     {% if is_recommendation_mismatched %}
                         <div class="alert alert-danger py-2 px-3 small border mb-3">
                             <i class="bi bi-exclamation-octagon-fill me-1"></i> A newer AI analysis recommendation has been run and no longer matches this request. Approving is disabled.
@@ -174,17 +177,75 @@
                         </button>
                     </form>
                 {% elif approval.status == 'APPROVED' %}
-                    <div class="alert alert-success py-3 px-4 border mb-0 text-start" role="alert">
+                    <div class="alert alert-success py-3 px-4 border mb-3 text-start" role="alert">
                         <h6 class="alert-heading fw-bold mb-2"><i class="bi bi-check-circle-fill me-1"></i> Request Approved</h6>
+                        <p class="small mb-2"><strong>Approval Status:</strong> APPROVED</p>
                         <p class="small mb-2"><strong>Approved By:</strong> {{ approval.reviewed_by.username }}</p>
                         {% if approval.reason %}
                             <p class="small mb-2"><strong>Notes:</strong> {{ approval.reason }}</p>
                         {% endif %}
-                        <p class="small mb-0 text-muted">Action approved. Automation execution will be handled by the next phase.</p>
+                    </div>
+
+                    <!-- Automation Execution Panel -->
+                    <div class="border-top pt-3 mt-3">
+                        <h6 class="fw-bold text-dark mb-3"><i class="bi bi-cpu text-primary me-2"></i>AUTOMATION EXECUTION</h6>
+                        
+                        {% if not approval.execution or approval.execution.status != 'SUCCESS' %}
+                            <div class="bg-light p-3 rounded border mb-3" style="font-size: 0.88rem;">
+                                <ul class="list-unstyled mb-0 text-secondary">
+                                    <li class="mb-1"><strong>Approval Status:</strong> APPROVED</li>
+                                    <li class="mb-1"><strong>Action:</strong> <code class="text-dark bg-white px-1.5 py-0.5 rounded border">{{ approval.runbook.automation_action|default:"None" }}</code></li>
+                                    <li class="mb-1"><strong>Safety:</strong> <span class="text-success fw-bold">Ready for validation</span></li>
+                                    <li class="mb-1"><strong>Mode:</strong> <span class="text-muted fw-semibold">Simulation</span></li>
+                                </ul>
+                            </div>
+
+                            <form method="post" action="{% url 'admin_approval_execute' approval.pk %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-primary w-100 fw-semibold"
+                                    {% if not approval.runbook.is_active or not approval.runbook.automation_action %}disabled{% endif %}>
+                                    <i class="bi bi-play-circle me-1"></i> Execute Approved Action
+                                </button>
+                            </form>
+                        {% endif %}
+
+                        {% if approval.execution %}
+                            <div class="mt-3">
+                                <div class="card bg-light border p-3" style="font-size: 0.85rem;">
+                                    <h6 class="fw-bold text-dark mb-2">Execution Results</h6>
+                                    <ul class="list-unstyled mb-3 text-secondary">
+                                        <li class="mb-1"><strong>Execution Status:</strong> 
+                                            {% if approval.execution.status == 'SUCCESS' %}
+                                                <span class="badge bg-success">SUCCESS</span>
+                                            {% elif approval.execution.status == 'FAILED' %}
+                                                <span class="badge bg-danger">FAILED</span>
+                                            {% elif approval.execution.status == 'BLOCKED' %}
+                                                <span class="badge bg-secondary text-dark">BLOCKED</span>
+                                            {% else %}
+                                                <span class="badge bg-warning text-dark">{{ approval.execution.status }}</span>
+                                            {% endif %}
+                                        </li>
+                                        <li class="mb-1"><strong>Mode:</strong> Simulation</li>
+                                        {% if approval.execution.output %}
+                                            <li class="mb-1"><strong>Output:</strong> {{ approval.execution.output }}</li>
+                                        {% endif %}
+                                        {% if approval.execution.error_message %}
+                                            <li class="mb-1 text-danger"><strong>Error:</strong> {{ approval.execution.error_message }}</li>
+                                        {% endif %}
+                                        <li class="mb-1"><strong>Started:</strong> {{ approval.execution.started_at|date:"H:i:s"|default:"--" }}</li>
+                                        <li><strong>Completed:</strong> {{ approval.execution.completed_at|date:"H:i:s"|default:"--" }}</li>
+                                    </ul>
+                                    <a href="{% url 'execution_detail' approval.pk %}" class="btn btn-sm btn-outline-secondary w-100 fw-semibold">
+                                        <i class="bi bi-terminal me-1"></i> View Detailed Logs
+                                    </a>
+                                </div>
+                            </div>
+                        {% endif %}
                     </div>
                 {% elif approval.status == 'REJECTED' %}
                     <div class="alert alert-danger py-3 px-4 border mb-0 text-start" role="alert">
                         <h6 class="alert-heading fw-bold mb-2"><i class="bi bi-x-circle-fill me-1"></i> Request Rejected</h6>
+                        <p class="small mb-2"><strong>Approval Status:</strong> REJECTED</p>
                         <p class="small mb-2"><strong>Rejected By:</strong> {{ approval.reviewed_by.username }}</p>
                         <p class="small mb-2"><strong>Reason:</strong> {{ approval.reason }}</p>
                         <p class="small mb-0 text-muted">Automation was not approved. Manual investigation may be required.</p>

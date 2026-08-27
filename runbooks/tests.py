@@ -5,7 +5,7 @@ from django.utils import timezone
 from accounts.models import Profile
 from incidents.models import Incident, IncidentActivity
 from runbooks.models import Runbook, RunbookRecommendation
-from automation.models import AutomationApproval
+from automation.models import AutomationApproval, AutomationExecution
 
 User = get_user_model()
 
@@ -854,3 +854,319 @@ class Phase4ComprehensiveTestSuite(TestCase):
         approval.refresh_from_db()
         # Verify status remains REJECTED
         self.assertEqual(approval.status, AutomationApproval.ApprovalStatus.REJECTED)
+
+    # ============================================================
+    # PHASE 6 TESTS
+    # ============================================================
+
+    def test_phase6_allowlist_success(self):
+        client = Client()
+        client.login(username='admin', password='adminpassword')
+
+        # Create incident
+        inc = Incident.objects.create(
+            title='Nginx is slow',
+            description='Web server is slow',
+            category=Incident.Category.SERVER,
+            created_by=self.employee1
+        )
+        self.nginx_rb.automation_action = 'restart_nginx'
+        self.nginx_rb.save()
+
+        rec = RunbookRecommendation.objects.create(
+            incident=inc,
+            runbook=self.nginx_rb,
+            match_score=0.95
+        )
+        approval = AutomationApproval.objects.create(
+            incident=inc,
+            runbook=self.nginx_rb,
+            requested_by=self.admin_user,
+            status=AutomationApproval.ApprovalStatus.APPROVED,
+            reviewed_by=self.admin_user,
+            reviewed_at=timezone.now()
+        )
+        inc.status = Incident.Status.APPROVED
+        inc.save()
+
+        # POST to execute
+        response = client.post(reverse('admin_approval_execute', kwargs={'pk': approval.pk}))
+        self.assertEqual(response.status_code, 302)
+
+        # Verify execution is success
+        execution = AutomationExecution.objects.get(approval=approval)
+        self.assertEqual(execution.status, AutomationExecution.ExecutionStatus.SUCCESS)
+        self.assertEqual(execution.action_name, 'restart_nginx')
+        self.assertIn("simulated successfully", execution.output)
+
+        # Verify timeline events
+        start_logged = IncidentActivity.objects.filter(
+            incident=inc,
+            action='AUTOMATION_STARTED',
+            description__contains="Approved automation action started: restart_nginx."
+        ).exists()
+        self.assertTrue(start_logged)
+
+        success_logged = IncidentActivity.objects.filter(
+            incident=inc,
+            action='AUTOMATION_SUCCESS',
+            description__contains="Automation action completed successfully: restart_nginx."
+        ).exists()
+        self.assertTrue(success_logged)
+
+    def test_phase6_allowlist_failed(self):
+        client = Client()
+        client.login(username='admin', password='adminpassword')
+
+        inc = Incident.objects.create(
+            title='Test failing action',
+            description='Action failure testing',
+            category=Incident.Category.SERVER,
+            created_by=self.employee1
+        )
+        self.nginx_rb.automation_action = 'simulate_failure'
+        self.nginx_rb.save()
+
+        rec = RunbookRecommendation.objects.create(
+            incident=inc,
+            runbook=self.nginx_rb,
+            match_score=0.95
+        )
+        approval = AutomationApproval.objects.create(
+            incident=inc,
+            runbook=self.nginx_rb,
+            requested_by=self.admin_user,
+            status=AutomationApproval.ApprovalStatus.APPROVED,
+            reviewed_by=self.admin_user,
+            reviewed_at=timezone.now()
+        )
+        inc.status = Incident.Status.APPROVED
+        inc.save()
+
+        response = client.post(reverse('admin_approval_execute', kwargs={'pk': approval.pk}))
+        self.assertEqual(response.status_code, 302)
+
+        execution = AutomationExecution.objects.get(approval=approval)
+        self.assertEqual(execution.status, AutomationExecution.ExecutionStatus.FAILED)
+        self.assertEqual(execution.error_message, "Simulation failed: Simulated action failure.")
+
+        failure_logged = IncidentActivity.objects.filter(
+            incident=inc,
+            action='AUTOMATION_FAILED',
+            description__contains="Automation action failed: simulate_failure."
+        ).exists()
+        self.assertTrue(failure_logged)
+
+    def test_phase6_allowlist_blocked(self):
+        client = Client()
+        client.login(username='admin', password='adminpassword')
+
+        inc = Incident.objects.create(
+            title='Test unknown action',
+            description='Blocked action testing',
+            category=Incident.Category.SERVER,
+            created_by=self.employee1
+        )
+        self.nginx_rb.automation_action = 'delete_database'  # Not on allowlist
+        self.nginx_rb.save()
+
+        rec = RunbookRecommendation.objects.create(
+            incident=inc,
+            runbook=self.nginx_rb,
+            match_score=0.95
+        )
+        approval = AutomationApproval.objects.create(
+            incident=inc,
+            runbook=self.nginx_rb,
+            requested_by=self.admin_user,
+            status=AutomationApproval.ApprovalStatus.APPROVED,
+            reviewed_by=self.admin_user,
+            reviewed_at=timezone.now()
+        )
+        inc.status = Incident.Status.APPROVED
+        inc.save()
+
+        response = client.post(reverse('admin_approval_execute', kwargs={'pk': approval.pk}))
+        self.assertEqual(response.status_code, 302)
+
+        execution = AutomationExecution.objects.get(approval=approval)
+        self.assertEqual(execution.status, AutomationExecution.ExecutionStatus.BLOCKED)
+        self.assertEqual(execution.error_message, "Action is not present in the approved automation allowlist.")
+
+        blocked_logged = IncidentActivity.objects.filter(
+            incident=inc,
+            action='AUTOMATION_BLOCKED',
+            description="Automation action blocked by safety validation."
+        ).exists()
+        self.assertTrue(blocked_logged)
+
+    def test_phase6_blocked_pending(self):
+        client = Client()
+        client.login(username='admin', password='adminpassword')
+
+        inc = Incident.objects.create(
+            title='Test pending action',
+            description='Pending validation testing',
+            category=Incident.Category.SERVER,
+            created_by=self.employee1
+        )
+        self.nginx_rb.automation_action = 'restart_nginx'
+        self.nginx_rb.save()
+
+        approval = AutomationApproval.objects.create(
+            incident=inc,
+            runbook=self.nginx_rb,
+            requested_by=self.admin_user,
+            status=AutomationApproval.ApprovalStatus.PENDING
+        )
+
+        response = client.post(reverse('admin_approval_execute', kwargs={'pk': approval.pk}))
+        self.assertEqual(response.status_code, 302)
+
+        execution = AutomationExecution.objects.get(approval=approval)
+        self.assertEqual(execution.status, AutomationExecution.ExecutionStatus.BLOCKED)
+        self.assertEqual(execution.error_message, "Approval status must be APPROVED.")
+
+    def test_phase6_blocked_rejected(self):
+        client = Client()
+        client.login(username='admin', password='adminpassword')
+
+        inc = Incident.objects.create(
+            title='Test rejected action',
+            description='Rejected validation testing',
+            category=Incident.Category.SERVER,
+            created_by=self.employee1
+        )
+        self.nginx_rb.automation_action = 'restart_nginx'
+        self.nginx_rb.save()
+
+        approval = AutomationApproval.objects.create(
+            incident=inc,
+            runbook=self.nginx_rb,
+            requested_by=self.admin_user,
+            status=AutomationApproval.ApprovalStatus.REJECTED,
+            reviewed_by=self.admin_user,
+            reviewed_at=timezone.now()
+        )
+
+        response = client.post(reverse('admin_approval_execute', kwargs={'pk': approval.pk}))
+        self.assertEqual(response.status_code, 302)
+
+        execution = AutomationExecution.objects.get(approval=approval)
+        self.assertEqual(execution.status, AutomationExecution.ExecutionStatus.BLOCKED)
+
+    def test_phase6_blocked_inactive_runbook(self):
+        client = Client()
+        client.login(username='admin', password='adminpassword')
+
+        inc = Incident.objects.create(
+            title='Test inactive runbook action',
+            description='Inactive validation testing',
+            category=Incident.Category.SERVER,
+            created_by=self.employee1
+        )
+        self.nginx_rb.automation_action = 'restart_nginx'
+        self.nginx_rb.is_active = False  # Deactivate!
+        self.nginx_rb.save()
+
+        approval = AutomationApproval.objects.create(
+            incident=inc,
+            runbook=self.nginx_rb,
+            requested_by=self.admin_user,
+            status=AutomationApproval.ApprovalStatus.APPROVED,
+            reviewed_by=self.admin_user,
+            reviewed_at=timezone.now()
+        )
+
+        # POST execute
+        response = client.post(reverse('admin_approval_execute', kwargs={'pk': approval.pk}))
+        self.assertEqual(response.status_code, 302)
+
+        execution = AutomationExecution.objects.get(approval=approval)
+        self.assertEqual(execution.status, AutomationExecution.ExecutionStatus.BLOCKED)
+        self.assertEqual(execution.error_message, "Runbook is no longer active.")
+
+        # Reactivate Nginx runbook for other tests
+        self.nginx_rb.is_active = True
+        self.nginx_rb.save()
+
+    def test_phase6_duplicate_execution_prevention(self):
+        client = Client()
+        client.login(username='admin', password='adminpassword')
+
+        inc = Incident.objects.create(
+            title='Test duplicate run',
+            description='Duplicate execution testing',
+            category=Incident.Category.SERVER,
+            created_by=self.employee1
+        )
+        self.nginx_rb.automation_action = 'restart_nginx'
+        self.nginx_rb.save()
+
+        approval = AutomationApproval.objects.create(
+            incident=inc,
+            runbook=self.nginx_rb,
+            requested_by=self.admin_user,
+            status=AutomationApproval.ApprovalStatus.APPROVED,
+            reviewed_by=self.admin_user,
+            reviewed_at=timezone.now()
+        )
+        
+        # Pre-create successful execution
+        execution = AutomationExecution.objects.create(
+            approval=approval,
+            action_name='restart_nginx',
+            status=AutomationExecution.ExecutionStatus.SUCCESS,
+            output="Done"
+        )
+
+        # POST execute again
+        response = client.post(reverse('admin_approval_execute', kwargs={'pk': approval.pk}))
+        self.assertEqual(response.status_code, 302)
+        
+        # Verify no second execution created, output remains original
+        self.assertEqual(AutomationExecution.objects.filter(approval=approval).count(), 1)
+        self.assertEqual(execution.output, "Done")
+
+    def test_phase6_employee_execution_security(self):
+        client = Client()
+        client.login(username='emp1', password='emppassword')
+
+        inc = Incident.objects.create(
+            title='Test security',
+            description='Employee execution blocks',
+            category=Incident.Category.SERVER,
+            created_by=self.employee1
+        )
+        approval = AutomationApproval.objects.create(
+            incident=inc,
+            runbook=self.nginx_rb,
+            requested_by=self.admin_user,
+            status=AutomationApproval.ApprovalStatus.APPROVED,
+            reviewed_by=self.admin_user,
+            reviewed_at=timezone.now()
+        )
+
+        # POST to execute
+        response = client.post(reverse('admin_approval_execute', kwargs={'pk': approval.pk}))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('employee_dashboard'), response.url)
+
+        # GET execution detail page
+        response = client.get(reverse('execution_detail', kwargs={'pk': approval.pk}))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('employee_dashboard'), response.url)
+
+    def test_phase6_code_safety(self):
+        # Scan files for direct execution
+        import glob
+        pattern = 'V:/AIOps/**/*.py'
+        dangerous_tokens = ['os.system', 'subprocess.run', 'subprocess.Popen', 'shell=True', 'exec(', 'eval(']
+        
+        for filepath in glob.glob(pattern, recursive=True):
+            if 'venv' in filepath or 'tests.py' in filepath:
+                continue
+            with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+                for token in dangerous_tokens:
+                    self.assertNotIn(token, content, f"Dangerous token {token} found in {filepath}!")

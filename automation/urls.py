@@ -7,4 +7,6 @@ urlpatterns = [
     path('admin-portal/approvals/<int:pk>/', views.approval_detail, name='approval_detail'),
     path('admin-portal/approvals/<int:pk>/approve/', views.approve_action, name='approve_action'),
     path('admin-portal/approvals/<int:pk>/reject/', views.reject_action, name='reject_action'),
+    path('admin-portal/approvals/<int:pk>/execute/', views.admin_approval_execute, name='admin_approval_execute'),
+    path('admin-portal/approvals/<int:pk>/execution/', views.execution_detail, name='execution_detail'),
 ]

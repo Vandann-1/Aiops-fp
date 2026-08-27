@@ -8,8 +8,8 @@ from django.http import HttpResponseNotAllowed
 
 from accounts.decorators import it_admin_required
 from incidents.models import Incident, IncidentActivity
-from runbooks.models import Runbook, RunbookRecommendation
-from .models import AutomationApproval
+from .models import AutomationApproval, AutomationExecution
+from automation.executor import execute_approved_action
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +145,11 @@ def approve_action(request, pk):
     )
 
     messages.success(request, "Action approved. Automation execution will be handled by the next phase.")
-    return redirect('approval_detail', pk=approval.pk)
+    
+    referer = request.META.get('HTTP_REFERER', '')
+    if 'approvals' in referer:
+        return redirect('approval_detail', pk=approval.pk)
+    return redirect('admin_incident_detail', pk=approval.incident.pk)
 
 
 @login_required
@@ -186,4 +190,60 @@ def reject_action(request, pk):
     )
 
     messages.warning(request, "Automation was not approved. Manual investigation may be required.")
-    return redirect('approval_detail', pk=approval.pk)
+    
+    referer = request.META.get('HTTP_REFERER', '')
+    if 'approvals' in referer:
+        return redirect('approval_detail', pk=approval.pk)
+    return redirect('admin_incident_detail', pk=approval.incident.pk)
+
+
+@login_required
+@it_admin_required
+def admin_approval_execute(request, pk):
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+
+    approval = get_object_or_404(AutomationApproval, pk=pk)
+
+    # 1. Verify approval is APPROVED. If not, log it as BLOCKED.
+    if approval.status != AutomationApproval.ApprovalStatus.APPROVED:
+        execution = execute_approved_action(approval)
+        messages.error(request, f"Automation blocked: {execution.error_message}")
+        referer = request.META.get('HTTP_REFERER', '')
+        if 'approvals' in referer:
+            return redirect('approval_detail', pk=approval.pk)
+        return redirect('admin_incident_detail', pk=approval.incident.pk)
+
+    # 2. Check if successful execution already exists (to prevent duplicate run)
+    if hasattr(approval, 'execution') and approval.execution.status == AutomationExecution.ExecutionStatus.SUCCESS:
+        messages.warning(request, "This approved action has already been successfully executed.")
+        referer = request.META.get('HTTP_REFERER', '')
+        if 'approvals' in referer:
+            return redirect('approval_detail', pk=approval.pk)
+        return redirect('admin_incident_detail', pk=approval.incident.pk)
+
+    # 3. Run executor
+    execution = execute_approved_action(approval)
+
+    if execution.status == AutomationExecution.ExecutionStatus.SUCCESS:
+        messages.success(request, f"Automation action completed successfully: {execution.action_name}.")
+    elif execution.status == AutomationExecution.ExecutionStatus.FAILED:
+        messages.error(request, f"Automation action failed: {execution.error_message or execution.output}")
+    elif execution.status == AutomationExecution.ExecutionStatus.BLOCKED:
+        messages.error(request, f"Automation blocked: {execution.error_message}")
+
+    referer = request.META.get('HTTP_REFERER', '')
+    if 'approvals' in referer:
+        return redirect('approval_detail', pk=approval.pk)
+    return redirect('admin_incident_detail', pk=approval.incident.pk)
+
+
+@login_required
+@it_admin_required
+def execution_detail(request, pk):
+    approval = get_object_or_404(AutomationApproval, pk=pk)
+    execution = get_object_or_404(AutomationExecution, approval=approval)
+    return render(request, 'admin_portal/execution_detail.html', {
+        'approval': approval,
+        'execution': execution
+    })
