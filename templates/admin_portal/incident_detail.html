@@ -258,10 +258,20 @@
                                     </a>
                                 {% endwith %}
                             {% endif %}
-                        {% elif incident.status == 'APPROVED' %}
-                            <div class="alert alert-success py-2 px-3 small border mb-3">
-                                <i class="bi bi-check-circle-fill me-1"></i> Approval Approved
-                            </div>
+                        {% elif incident.status == 'APPROVED' or incident.status == 'RESOLVED' or incident.status == 'IN_PROGRESS' %}
+                            {% if incident.status == 'RESOLVED' %}
+                                <div class="alert alert-success py-2 px-3 small border mb-3">
+                                    <i class="bi bi-check-circle-fill me-1"></i> Incident Resolved via Verified Automation
+                                </div>
+                            {% elif incident.status == 'IN_PROGRESS' %}
+                                <div class="alert alert-warning py-2 px-3 small border mb-3">
+                                    <i class="bi bi-exclamation-triangle-fill me-1"></i> Execution Verified — Issue Persisting (In Progress)
+                                </div>
+                            {% else %}
+                                <div class="alert alert-success py-2 px-3 small border mb-3">
+                                    <i class="bi bi-check-circle-fill me-1"></i> Approval Approved
+                                </div>
+                            {% endif %}
                             {% if incident.approvals.exists %}
                                 {% with app=incident.approvals.first %}
                                     {% if not app.execution or app.execution.status == 'PENDING' %}

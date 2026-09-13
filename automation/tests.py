@@ -7,7 +7,7 @@ from django.conf import settings
 from accounts.models import Profile
 from incidents.models import Incident, IncidentActivity
 from runbooks.models import Runbook, RunbookRecommendation
-from automation.models import AutomationApproval, AutomationExecution
+from automation.models import AutomationApproval, AutomationExecution, VerificationResult
 from automation.actions import SAFE_ACTIONS
 
 User = get_user_model()
@@ -475,6 +475,13 @@ class Phase7VerificationTests(TestCase):
             status=Incident.Status.APPROVED
         )
 
+        # 3b. Recommendation
+        self.recommendation = RunbookRecommendation.objects.create(
+            incident=self.incident,
+            runbook=self.runbook,
+            match_score=0.95
+        )
+
         # 4. Approval
         self.approval = AutomationApproval.objects.create(
             incident=self.incident,
@@ -773,6 +780,11 @@ class Phase7VerificationTests(TestCase):
             priority=Incident.Priority.HIGH,
             created_by=self.employee,
             status=Incident.Status.APPROVED
+        )
+        RunbookRecommendation.objects.create(
+            incident=failing_incident,
+            runbook=failing_runbook,
+            match_score=0.95
         )
         failing_approval = AutomationApproval.objects.create(
             incident=failing_incident,
