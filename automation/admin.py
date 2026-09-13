@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import AutomationApproval, AutomationExecution
+from .models import AutomationApproval, AutomationExecution, VerificationResult
 
 class AutomationApprovalAdmin(admin.ModelAdmin):
     list_display = (
@@ -34,5 +34,20 @@ class AutomationExecutionAdmin(admin.ModelAdmin):
         'action_name'
     )
 
+class VerificationResultAdmin(admin.ModelAdmin):
+    list_display = (
+        'execution',
+        'status',
+        'checked_at'
+    )
+    list_filter = ('status', 'checked_at')
+    search_fields = (
+        'execution__approval__incident__incident_number',
+        'execution__action_name',
+        'message'
+    )
+
 admin.site.register(AutomationApproval, AutomationApprovalAdmin)
 admin.site.register(AutomationExecution, AutomationExecutionAdmin)
+admin.site.register(VerificationResult, VerificationResultAdmin)
+

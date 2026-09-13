@@ -117,6 +117,16 @@
                                         <p class="small mb-0 text-muted">An IT administrator approved the recommended action. Execution simulation has not yet occurred.</p>
                                     </div>
                                 {% endif %}
+                            {% elif incident.status == 'RESOLVED' %}
+                                <div class="alert alert-success py-3 px-4 border mb-3 text-start" role="alert">
+                                    <h6 class="alert-heading fw-bold mb-1"><i class="bi bi-check-circle-fill me-1"></i> Incident Resolved</h6>
+                                    <p class="small mb-0 text-muted">Automation was executed and verified successfully. Incident is resolved.</p>
+                                </div>
+                            {% elif incident.status == 'IN_PROGRESS' %}
+                                <div class="alert alert-info py-3 px-4 border mb-3 text-start" role="alert">
+                                    <h6 class="alert-heading fw-bold mb-1"><i class="bi bi-gear-fill me-1"></i> Investigation In Progress</h6>
+                                    <p class="small mb-0 text-muted">An IT administrator is investigating and working towards resolution.</p>
+                                </div>
                             {% elif incident.status == 'REJECTED' %}
                                 <div class="alert alert-danger py-3 px-4 border mb-3 text-start" role="alert">
                                     <h6 class="alert-heading fw-bold mb-1"><i class="bi bi-x-circle-fill me-1"></i> Action Rejected</h6>

@@ -188,15 +188,24 @@
 
                     <!-- Automation Execution Panel -->
                     <div class="border-top pt-3 mt-3">
-                        <h6 class="fw-bold text-dark mb-3"><i class="bi bi-cpu text-primary me-2"></i>AUTOMATION EXECUTION</h6>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fw-bold text-dark mb-0"><i class="bi bi-cpu text-primary me-2"></i>SAFE AUTOMATION</h6>
+                            <span class="badge bg-secondary-subtle text-dark border" style="font-size: 0.72rem;">SIMULATION MODE</span>
+                        </div>
+
+                        <!-- Warning / Info Box -->
+                        <div class="alert alert-info py-2 px-3 small border mb-3">
+                            <i class="bi bi-shield-lock-fill text-primary me-1"></i>
+                            <strong>Simulation Mode:</strong> This college project uses controlled mock automation. No real server or operating-system command will be executed.
+                        </div>
                         
                         {% if not approval.execution or approval.execution.status != 'SUCCESS' %}
                             <div class="bg-light p-3 rounded border mb-3" style="font-size: 0.88rem;">
                                 <ul class="list-unstyled mb-0 text-secondary">
-                                    <li class="mb-1"><strong>Approval Status:</strong> APPROVED</li>
-                                    <li class="mb-1"><strong>Action:</strong> <code class="text-dark bg-white px-1.5 py-0.5 rounded border">{{ approval.runbook.automation_action|default:"None" }}</code></li>
-                                    <li class="mb-1"><strong>Safety:</strong> <span class="text-success fw-bold">Ready for validation</span></li>
-                                    <li class="mb-1"><strong>Mode:</strong> <span class="text-muted fw-semibold">Simulation</span></li>
+                                    <li class="mb-1"><strong>Runbook:</strong> {{ approval.runbook.title }}</li>
+                                    <li class="mb-1"><strong>Automation Action:</strong> <code class="text-dark bg-white px-1.5 py-0.5 rounded border">{{ approval.runbook.automation_action|default:"None" }}</code></li>
+                                    <li class="mb-1"><strong>Safety:</strong> <span class="badge bg-success-subtle text-success border border-success-subtle">Allowlisted</span></li>
+                                    <li class="mb-0"><strong>Mode:</strong> <span class="badge bg-secondary-subtle text-secondary border">Simulation Mode</span></li>
                                 </ul>
                             </div>
 
@@ -212,32 +221,83 @@
                         {% if approval.execution %}
                             <div class="mt-3">
                                 <div class="card bg-light border p-3" style="font-size: 0.85rem;">
-                                    <h6 class="fw-bold text-dark mb-2">Execution Results</h6>
+                                    <h6 class="fw-bold text-dark mb-2"><i class="bi bi-terminal me-1"></i>Automation Execution</h6>
                                     <ul class="list-unstyled mb-3 text-secondary">
-                                        <li class="mb-1"><strong>Execution Status:</strong> 
+                                        <li class="mb-1"><strong>Action:</strong> <code class="text-dark bg-white px-1.5 py-0.5 rounded border">{{ approval.execution.action_name }}</code></li>
+                                        <li class="mb-1"><strong>Status:</strong> 
                                             {% if approval.execution.status == 'SUCCESS' %}
                                                 <span class="badge bg-success">SUCCESS</span>
                                             {% elif approval.execution.status == 'FAILED' %}
                                                 <span class="badge bg-danger">FAILED</span>
                                             {% elif approval.execution.status == 'BLOCKED' %}
-                                                <span class="badge bg-secondary text-dark">BLOCKED</span>
+                                                <span class="badge bg-secondary text-dark border">BLOCKED</span>
+                                            {% elif approval.execution.status == 'RUNNING' %}
+                                                <span class="badge bg-primary">RUNNING</span>
                                             {% else %}
                                                 <span class="badge bg-warning text-dark">{{ approval.execution.status }}</span>
                                             {% endif %}
                                         </li>
                                         <li class="mb-1"><strong>Mode:</strong> Simulation</li>
+                                        <li class="mb-1"><strong>Started:</strong> {{ approval.execution.started_at|date:"d M Y H:i:s"|default:"--" }}</li>
+                                        <li class="mb-1"><strong>Completed:</strong> {{ approval.execution.completed_at|date:"d M Y H:i:s"|default:"--" }}</li>
                                         {% if approval.execution.output %}
                                             <li class="mb-1"><strong>Output:</strong> {{ approval.execution.output }}</li>
                                         {% endif %}
                                         {% if approval.execution.error_message %}
-                                            <li class="mb-1 text-danger"><strong>Error:</strong> {{ approval.execution.error_message }}</li>
+                                            <li class="mb-0 text-danger"><strong>Error:</strong> {{ approval.execution.error_message }}</li>
                                         {% endif %}
-                                        <li class="mb-1"><strong>Started:</strong> {{ approval.execution.started_at|date:"H:i:s"|default:"--" }}</li>
-                                        <li><strong>Completed:</strong> {{ approval.execution.completed_at|date:"H:i:s"|default:"--" }}</li>
                                     </ul>
-                                    <a href="{% url 'execution_detail' approval.pk %}" class="btn btn-sm btn-outline-secondary w-100 fw-semibold">
+                                    <a href="{% url 'execution_detail' approval.pk %}" class="btn btn-sm btn-outline-secondary w-100 fw-semibold mb-2">
                                         <i class="bi bi-terminal me-1"></i> View Detailed Logs
                                     </a>
+
+                                    {% if approval.execution.status == 'SUCCESS' %}
+                                        <div class="border-top pt-3 mt-2">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <h6 class="fw-bold text-dark mb-0"><i class="bi bi-patch-check-fill text-success me-1"></i>VERIFICATION</h6>
+                                                <span class="badge bg-secondary-subtle text-dark border" style="font-size: 0.7rem;">SIMULATION MODE</span>
+                                            </div>
+
+                                            {% if approval.execution.verification %}
+                                                <div class="p-2.5 rounded border {% if approval.execution.verification.status == 'PASSED' %}bg-success-subtle border-success-subtle{% else %}bg-danger-subtle border-danger-subtle{% endif %} mb-2">
+                                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                                        <span class="small fw-semibold text-secondary">Status:</span>
+                                                        {% if approval.execution.verification.status == 'PASSED' %}
+                                                            <span class="badge bg-success">PASSED</span>
+                                                        {% else %}
+                                                            <span class="badge bg-danger">FAILED</span>
+                                                        {% endif %}
+                                                    </div>
+                                                    <div class="small text-secondary mb-1">
+                                                        <strong>Message:</strong> {{ approval.execution.verification.message }}
+                                                    </div>
+                                                    <div class="small text-muted" style="font-size: 0.75rem;">
+                                                        <strong>Checked At:</strong> {{ approval.execution.verification.checked_at|date:"d M Y • H:i:s" }}
+                                                    </div>
+                                                </div>
+
+                                                {% if approval.execution.verification.status == 'PASSED' %}
+                                                    <div class="alert alert-success py-1.5 px-2.5 small border mb-0 text-center fw-semibold">
+                                                        <i class="bi bi-check-circle-fill me-1"></i> Verification Passed • Incident Resolved
+                                                    </div>
+                                                {% else %}
+                                                    <div class="alert alert-danger py-1.5 px-2.5 small border mb-0 text-center">
+                                                        <i class="bi bi-exclamation-octagon-fill me-1"></i> Automation completed but verification failed. Manual investigation is required.
+                                                    </div>
+                                                {% endif %}
+                                            {% else %}
+                                                <p class="text-secondary small mb-2" style="font-size: 0.82rem;">
+                                                    Execution succeeded. Run simulated verification to confirm problem resolution before resolving ticket.
+                                                </p>
+                                                <form method="post" action="{% url 'admin_execution_verify' approval.execution.pk %}">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-success w-100 fw-semibold">
+                                                        <i class="bi bi-patch-check me-1"></i> Verify Execution
+                                                    </button>
+                                                </form>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
                                 </div>
                             </div>
                         {% endif %}

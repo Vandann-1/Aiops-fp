@@ -9,4 +9,7 @@ urlpatterns = [
     path('admin-portal/approvals/<int:pk>/reject/', views.reject_action, name='reject_action'),
     path('admin-portal/approvals/<int:pk>/execute/', views.admin_approval_execute, name='admin_approval_execute'),
     path('admin-portal/approvals/<int:pk>/execution/', views.execution_detail, name='execution_detail'),
+    path('admin-portal/executions/<int:pk>/verify/', views.admin_execution_verify, name='admin_execution_verify'),
+    path('admin-portal/approvals/<int:pk>/verify/', views.admin_approval_verify, name='admin_approval_verify'),
 ]
+

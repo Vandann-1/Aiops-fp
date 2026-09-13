@@ -247,3 +247,42 @@ def execution_detail(request, pk):
         'approval': approval,
         'execution': execution
     })
+
+
+@login_required
+@it_admin_required
+def admin_execution_verify(request, pk):
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+
+    execution = get_object_or_404(AutomationExecution, pk=pk)
+
+    from automation.verification import verify_execution
+    is_passed, verification, msg = verify_execution(execution, actor=request.user)
+
+    if is_passed:
+        messages.success(request, f"Verification PASSED: {msg} Incident marked as RESOLVED.")
+    else:
+        messages.warning(request, f"Verification FAILED: {msg}")
+
+    referer = request.META.get('HTTP_REFERER', '')
+    if 'execution' in referer:
+        return redirect('execution_detail', pk=execution.approval.pk)
+    elif 'approvals' in referer:
+        return redirect('approval_detail', pk=execution.approval.pk)
+    return redirect('admin_incident_detail', pk=execution.approval.incident.pk)
+
+
+@login_required
+@it_admin_required
+def admin_approval_verify(request, pk):
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+
+    approval = get_object_or_404(AutomationApproval, pk=pk)
+    if not hasattr(approval, 'execution'):
+        messages.error(request, "No execution record exists for this approval.")
+        return redirect('approval_detail', pk=approval.pk)
+
+    return admin_execution_verify(request, approval.execution.pk)
+

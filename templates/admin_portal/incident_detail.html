@@ -108,8 +108,8 @@
                                     <code class="text-dark bg-light px-2.5 py-1 rounded border d-inline-block" style="font-size: 0.8rem;">
                                         {{ rec.runbook.automation_action|default:"None" }}
                                     </code>
-                                    <div class="text-danger small mt-1.5 fw-semibold">
-                                        <i class="bi bi-slash-circle me-1"></i> Automation is not available in Phase 4.
+                                    <div class="text-success small mt-1.5 fw-semibold">
+                                        <i class="bi bi-shield-check me-1"></i> Safe Automation (Simulation Mode)
                                     </div>
                                 </div>
                             </div>
@@ -293,17 +293,51 @@
                                                         <span class="badge bg-warning text-dark">{{ app.execution.status }}</span>
                                                     {% endif %}
                                                 </li>
-                                                {% if app.execution.status != 'SUCCESS' %}
-                                                    <form method="post" action="{% url 'admin_approval_execute' app.pk %}" class="mt-3">
-                                                        {% csrf_token %}
-                                                        <button type="submit" class="btn btn-sm btn-primary w-100 fw-semibold">
-                                                            <i class="bi bi-play-circle me-1"></i> Retry Execution
-                                                        </button>
-                                                    </form>
-                                                {% endif %}
-                                            </ul>
-                                        </div>
-                                    {% endif %}
+                                                 {% if app.execution.output %}
+                                                     <li class="mb-1"><strong>Output:</strong> {{ app.execution.output }}</li>
+                                                 {% endif %}
+                                                 {% if app.execution.status == 'FAILED' %}
+                                                     <div class="alert alert-danger py-2 px-2.5 small border mt-2 mb-0" style="font-size: 0.78rem;">
+                                                         <i class="bi bi-exclamation-octagon-fill me-1"></i> Automation execution failed. Manual investigation may be required.
+                                                     </div>
+                                                 {% elif app.execution.status == 'BLOCKED' %}
+                                                     <div class="alert alert-warning py-2 px-2.5 small border mt-2 mb-0" style="font-size: 0.78rem;">
+                                                         <i class="bi bi-shield-exclamation me-1"></i> Automation execution blocked by safety policy.
+                                                     </div>
+                                                 {% elif app.execution.status == 'SUCCESS' %}
+                                                     <!-- Verification Block -->
+                                                     <div class="border-top pt-2 mt-2">
+                                                         <div class="d-flex justify-content-between align-items-center mb-1.5">
+                                                             <strong class="text-dark"><i class="bi bi-patch-check-fill text-success me-1"></i>Verification:</strong>
+                                                             <span class="badge bg-secondary-subtle text-dark border" style="font-size: 0.68rem;">SIMULATION MODE</span>
+                                                         </div>
+                                                         {% if app.execution.verification %}
+                                                             <div class="p-2 rounded border mb-2 {% if app.execution.verification.status == 'PASSED' %}bg-success-subtle border-success-subtle{% else %}bg-danger-subtle border-danger-subtle{% endif %}">
+                                                                 <div class="d-flex justify-content-between align-items-center mb-1">
+                                                                     <span class="fw-semibold">Status:</span>
+                                                                     {% if app.execution.verification.status == 'PASSED' %}
+                                                                         <span class="badge bg-success">PASSED</span>
+                                                                     {% else %}
+                                                                         <span class="badge bg-danger">FAILED</span>
+                                                                     {% endif %}
+                                                                 </div>
+                                                                 <div class="mb-1"><strong>Message:</strong> {{ app.execution.verification.message }}</div>
+                                                                 <div class="text-muted mb-1" style="font-size: 0.72rem;"><strong>Checked At:</strong> {{ app.execution.verification.checked_at|date:"d M Y • H:i:s" }}</div>
+                                                                 <div><strong>Incident Status:</strong> <span class="badge {% if incident.status == 'RESOLVED' %}bg-success{% else %}bg-warning text-dark{% endif %}">{{ incident.get_status_display }}</span></div>
+                                                             </div>
+                                                         {% else %}
+                                                             <form method="post" action="{% url 'admin_execution_verify' app.execution.pk %}" class="mt-2 mb-2">
+                                                                 {% csrf_token %}
+                                                                 <button type="submit" class="btn btn-sm btn-success w-100 fw-semibold">
+                                                                     <i class="bi bi-patch-check me-1"></i> Verify Execution
+                                                                 </button>
+                                                             </form>
+                                                         {% endif %}
+                                                     </div>
+                                                 {% endif %}
+                                             </ul>
+                                         </div>
+                                     {% endif %}
                                     <a href="{% url 'approval_detail' app.pk %}" class="btn btn-outline-primary w-100 fw-semibold">
                                         <i class="bi bi-eye me-1"></i> View Approval
                                     </a>

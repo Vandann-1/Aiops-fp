@@ -107,3 +107,36 @@ class AutomationExecution(models.Model):
 
     def __str__(self):
         return f"Execution for Approval #{self.approval.id}: {self.status}"
+
+
+class VerificationResult(models.Model):
+    class Status(models.TextChoices):
+        PASSED = 'PASSED', 'Passed'
+        FAILED = 'FAILED', 'Failed'
+
+    execution = models.OneToOneField(
+        AutomationExecution,
+        on_delete=models.CASCADE,
+        related_name='verification',
+        help_text="The automation execution record being verified"
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        help_text="Outcome of the simulated verification check"
+    )
+    message = models.TextField(
+        blank=True,
+        help_text="Detailed output message from the verification simulation"
+    )
+    checked_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Timestamp when verification was performed"
+    )
+
+    class Meta:
+        ordering = ['-checked_at']
+
+    def __str__(self):
+        return f"Verification for Execution #{self.execution.id}: {self.status}"
+
