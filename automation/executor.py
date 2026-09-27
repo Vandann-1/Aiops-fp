@@ -86,6 +86,17 @@ def execute_approved_action(approval):
             description="Automation action blocked by safety validation.",
             actor=approval.reviewed_by or approval.requested_by
         )
+
+        # Phase 8: Record audit log
+        from automation.audit import create_audit_log
+        from automation.models import AuditLog
+        create_audit_log(
+            incident=approval.incident,
+            event_type=AuditLog.EventType.AUTOMATION_BLOCKED,
+            message="Automation execution was blocked by the safety policy.",
+            actor=approval.reviewed_by or approval.requested_by,
+            metadata={"action_name": action_name, "reason": reason}
+        )
         return execution
         
     # Transition to RUNNING
@@ -102,6 +113,17 @@ def execute_approved_action(approval):
         action='AUTOMATION_STARTED',
         description=f"Approved automation action started: {action_name}.",
         actor=approval.reviewed_by or approval.requested_by
+    )
+
+    # Phase 8: Record audit log
+    from automation.audit import create_audit_log
+    from automation.models import AuditLog
+    create_audit_log(
+        incident=approval.incident,
+        event_type=AuditLog.EventType.AUTOMATION_STARTED,
+        message=f"Simulated automation execution started for action '{action_name}'.",
+        actor=approval.reviewed_by or approval.requested_by,
+        metadata={"action_name": action_name}
     )
     
     try:
@@ -122,6 +144,15 @@ def execute_approved_action(approval):
                 description=f"Automation action completed successfully: {action_name}.",
                 actor=approval.reviewed_by or approval.requested_by
             )
+
+            # Phase 8: Record audit log
+            create_audit_log(
+                incident=approval.incident,
+                event_type=AuditLog.EventType.AUTOMATION_COMPLETED,
+                message="Simulated automation execution completed successfully.",
+                actor=approval.reviewed_by or approval.requested_by,
+                metadata={"action_name": action_name, "output": execution.output}
+            )
         else:
             execution.status = AutomationExecution.ExecutionStatus.FAILED
             execution.error_message = result.get("message", "Simulation failed.")
@@ -135,6 +166,15 @@ def execute_approved_action(approval):
                 description=f"Automation action failed: {action_name}.",
                 actor=approval.reviewed_by or approval.requested_by
             )
+
+            # Phase 8: Record audit log
+            create_audit_log(
+                incident=approval.incident,
+                event_type=AuditLog.EventType.AUTOMATION_FAILED,
+                message="Simulated automation execution failed.",
+                actor=approval.reviewed_by or approval.requested_by,
+                metadata={"action_name": action_name, "error": execution.error_message}
+            )
     except Exception as e:
         execution.status = AutomationExecution.ExecutionStatus.FAILED
         execution.error_message = str(e)
@@ -147,6 +187,15 @@ def execute_approved_action(approval):
             action='AUTOMATION_FAILED',
             description=f"Automation action failed: {action_name}.",
             actor=approval.reviewed_by or approval.requested_by
+        )
+
+        # Phase 8: Record audit log
+        create_audit_log(
+            incident=approval.incident,
+            event_type=AuditLog.EventType.AUTOMATION_FAILED,
+            message="Simulated automation execution failed.",
+            actor=approval.reviewed_by or approval.requested_by,
+            metadata={"action_name": action_name, "error": str(e)}
         )
         
     return execution

@@ -7,7 +7,8 @@ from django.conf import settings
 from accounts.models import Profile
 from incidents.models import Incident, IncidentActivity
 from runbooks.models import Runbook, RunbookRecommendation
-from automation.models import AutomationApproval, AutomationExecution, VerificationResult
+from automation.models import AutomationApproval, AutomationExecution, VerificationResult, AuditLog
+from automation.audit import create_audit_log
 from automation.actions import SAFE_ACTIONS
 
 User = get_user_model()
@@ -818,5 +819,548 @@ class Phase7VerificationTests(TestCase):
         self.assertEqual(inc_resp.status_code, 200)
         self.assertContains(inc_resp, "FAILED")
         self.assertNotEqual(failing_incident.status, Incident.Status.RESOLVED)
+
+
+class Phase8AuditMonitoringTests(TestCase):
+    def setUp(self):
+        # 1. Admin and Employee users
+        self.admin_user = User.objects.create_user(username='admin_p8', password='adminpassword')
+        self.admin_user.profile.role = Profile.Role.IT_ADMIN
+        self.admin_user.profile.save()
+
+        self.employee = User.objects.create_user(username='employee_p8', password='employeepassword')
+        self.employee.profile.role = Profile.Role.EMPLOYEE
+        self.employee.profile.save()
+
+        # 2. Allowlisted active runbook
+        self.runbook = Runbook.objects.create(
+            title='Restart Nginx Web Server',
+            category=Incident.Category.SERVER,
+            description='Procedure for restarting Nginx.',
+            symptoms='Nginx down 502 bad gateway',
+            steps='Restart nginx service',
+            risk_level=Runbook.RiskLevel.MEDIUM,
+            automation_action='restart_nginx',
+            created_by=self.admin_user,
+            is_active=True
+        )
+
+        # 3. Test incident (creates INCIDENT_CREATED via signal)
+        self.incident = Incident.objects.create(
+            title='Nginx Service Down',
+            description='Nginx server is not responding to requests.',
+            category=Incident.Category.SERVER,
+            priority=Incident.Priority.HIGH,
+            created_by=self.employee,
+            status=Incident.Status.RECOMMENDATION_READY
+        )
+
+        # 4. Runbook recommendation
+        self.recommendation = RunbookRecommendation.objects.create(
+            incident=self.incident,
+            runbook=self.runbook,
+            match_score=0.92
+        )
+
+        # 5. Approval request
+        self.approval = AutomationApproval.objects.create(
+            incident=self.incident,
+            runbook=self.runbook,
+            requested_by=self.admin_user,
+            status=AutomationApproval.ApprovalStatus.PENDING
+        )
+
+    # TEST 1 — Incident creation creates audit event
+    def test_01_incident_creation_creates_audit_event(self):
+        new_inc = Incident.objects.create(
+            title='Database connection timed out',
+            description='PostgreSQL is rejecting connection pool requests.',
+            category=Incident.Category.DATABASE,
+            created_by=self.employee
+        )
+        self.assertTrue(AuditLog.objects.filter(incident=new_inc, event_type=AuditLog.EventType.INCIDENT_CREATED).exists())
+        log = AuditLog.objects.get(incident=new_inc, event_type=AuditLog.EventType.INCIDENT_CREATED)
+        self.assertEqual(log.actor, self.employee)
+        self.assertIn(new_inc.incident_number, log.message)
+
+    # TEST 2 — AI analysis audit event
+    def test_02_ai_analysis_audit_event(self):
+        from runbooks.retrieval import retrieve_best_runbook
+        res = retrieve_best_runbook(self.incident)
+        self.assertTrue(AuditLog.objects.filter(incident=self.incident, event_type=AuditLog.EventType.AI_ANALYSIS_COMPLETED).exists())
+        if res['runbook']:
+            self.assertTrue(AuditLog.objects.filter(incident=self.incident, event_type=AuditLog.EventType.RUNBOOK_RECOMMENDED).exists())
+            rec_log = AuditLog.objects.filter(incident=self.incident, event_type=AuditLog.EventType.RUNBOOK_RECOMMENDED).first()
+            self.assertIn(self.runbook.title, rec_log.message)
+
+    # TEST 3 — Approval request audit
+    def test_03_approval_request_audit(self):
+        new_inc = Incident.objects.create(
+            title='Web server alert',
+            description='Web service down.',
+            category=Incident.Category.SERVER,
+            created_by=self.employee,
+            status=Incident.Status.RECOMMENDATION_READY
+        )
+        RunbookRecommendation.objects.create(incident=new_inc, runbook=self.runbook, match_score=0.85)
+
+        client = Client()
+        client.login(username='admin_p8', password='adminpassword')
+        resp = client.post(reverse('admin_incident_request_approval', kwargs={'pk': new_inc.pk}))
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(AuditLog.objects.filter(incident=new_inc, event_type=AuditLog.EventType.APPROVAL_REQUESTED).exists())
+
+    # TEST 4 — Approval approved audit
+    def test_04_approval_approved_audit(self):
+        client = Client()
+        client.login(username='admin_p8', password='adminpassword')
+        resp = client.post(reverse('approve_action', kwargs={'pk': self.approval.pk}), {'reason': 'Approved by admin'})
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(AuditLog.objects.filter(incident=self.incident, event_type=AuditLog.EventType.APPROVAL_APPROVED).exists())
+
+    # TEST 5 — Approval rejected audit
+    def test_05_approval_rejected_audit(self):
+        rej_inc = Incident.objects.create(
+            title='High risk operation',
+            description='Dangerous request',
+            category=Incident.Category.SERVER,
+            created_by=self.employee
+        )
+        rej_app = AutomationApproval.objects.create(
+            incident=rej_inc,
+            runbook=self.runbook,
+            requested_by=self.admin_user,
+            status=AutomationApproval.ApprovalStatus.PENDING
+        )
+
+        client = Client()
+        client.login(username='admin_p8', password='adminpassword')
+        resp = client.post(reverse('reject_action', kwargs={'pk': rej_app.pk}), {'reason': 'Risk too high for automation'})
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(AuditLog.objects.filter(incident=rej_inc, event_type=AuditLog.EventType.APPROVAL_REJECTED).exists())
+        rej_log = AuditLog.objects.get(incident=rej_inc, event_type=AuditLog.EventType.APPROVAL_REJECTED)
+        self.assertIn("Risk too high for automation", rej_log.message)
+
+    # TEST 6 — Automation started audit
+    def test_06_automation_started_audit(self):
+        self.approval.status = AutomationApproval.ApprovalStatus.APPROVED
+        self.approval.save()
+
+        client = Client()
+        client.login(username='admin_p8', password='adminpassword')
+        client.post(reverse('admin_approval_execute', kwargs={'pk': self.approval.pk}))
+        self.assertTrue(AuditLog.objects.filter(incident=self.incident, event_type=AuditLog.EventType.AUTOMATION_STARTED).exists())
+
+    # TEST 7 — Automation success audit
+    def test_07_automation_success_audit(self):
+        self.approval.status = AutomationApproval.ApprovalStatus.APPROVED
+        self.approval.save()
+
+        client = Client()
+        client.login(username='admin_p8', password='adminpassword')
+        client.post(reverse('admin_approval_execute', kwargs={'pk': self.approval.pk}))
+        self.assertTrue(AuditLog.objects.filter(incident=self.incident, event_type=AuditLog.EventType.AUTOMATION_COMPLETED).exists())
+
+    # TEST 8 — Automation failure audit
+    def test_08_automation_failure_audit(self):
+        fail_rb = Runbook.objects.create(
+            title='Simulate Action Failure',
+            category=Incident.Category.SERVER,
+            description='Failing runbook',
+            symptoms='None',
+            steps='Fail',
+            risk_level=Runbook.RiskLevel.LOW,
+            automation_action='simulate_failure',
+            created_by=self.admin_user,
+            is_active=True
+        )
+        fail_inc = Incident.objects.create(
+            title='Failure incident',
+            description='Testing failure path',
+            category=Incident.Category.SERVER,
+            created_by=self.employee,
+            status=Incident.Status.APPROVED
+        )
+        fail_app = AutomationApproval.objects.create(
+            incident=fail_inc,
+            runbook=fail_rb,
+            requested_by=self.admin_user,
+            status=AutomationApproval.ApprovalStatus.APPROVED
+        )
+
+        from automation.executor import execute_approved_action
+        execute_approved_action(fail_app)
+        self.assertTrue(AuditLog.objects.filter(incident=fail_inc, event_type=AuditLog.EventType.AUTOMATION_FAILED).exists())
+
+    # TEST 9 — Automation blocked audit
+    def test_09_automation_blocked_audit(self):
+        blocked_inc = Incident.objects.create(
+            title='Blocked incident',
+            description='Testing blocked execution',
+            category=Incident.Category.SERVER,
+            created_by=self.employee
+        )
+        # Approval is PENDING, so executing should be BLOCKED
+        blocked_app = AutomationApproval.objects.create(
+            incident=blocked_inc,
+            runbook=self.runbook,
+            requested_by=self.admin_user,
+            status=AutomationApproval.ApprovalStatus.PENDING
+        )
+
+        from automation.executor import execute_approved_action
+        execute_approved_action(blocked_app)
+        self.assertTrue(AuditLog.objects.filter(incident=blocked_inc, event_type=AuditLog.EventType.AUTOMATION_BLOCKED).exists())
+
+    # TEST 10 — Verification started audit
+    def test_10_verification_started_audit(self):
+        self.approval.status = AutomationApproval.ApprovalStatus.APPROVED
+        self.approval.save()
+        execution = AutomationExecution.objects.create(
+            approval=self.approval,
+            action_name='restart_nginx',
+            status=AutomationExecution.ExecutionStatus.SUCCESS,
+            completed_at=timezone.now()
+        )
+
+        client = Client()
+        client.login(username='admin_p8', password='adminpassword')
+        client.post(reverse('admin_execution_verify', kwargs={'pk': execution.pk}))
+        self.assertTrue(AuditLog.objects.filter(incident=self.incident, event_type=AuditLog.EventType.VERIFICATION_STARTED).exists())
+
+    # TEST 11 — Verification passed audit
+    def test_11_verification_passed_audit(self):
+        self.approval.status = AutomationApproval.ApprovalStatus.APPROVED
+        self.approval.save()
+        execution = AutomationExecution.objects.create(
+            approval=self.approval,
+            action_name='restart_nginx',
+            status=AutomationExecution.ExecutionStatus.SUCCESS,
+            completed_at=timezone.now()
+        )
+
+        client = Client()
+        client.login(username='admin_p8', password='adminpassword')
+        client.post(reverse('admin_execution_verify', kwargs={'pk': execution.pk}))
+        self.assertTrue(AuditLog.objects.filter(incident=self.incident, event_type=AuditLog.EventType.VERIFICATION_PASSED).exists())
+
+    # TEST 12 — Verification failed audit
+    def test_12_verification_failed_audit(self):
+        fail_rb = Runbook.objects.create(
+            title='Verification Fail Procedure',
+            category=Incident.Category.SERVER,
+            description='Fails verification check',
+            symptoms='Fail',
+            steps='Fail',
+            risk_level=Runbook.RiskLevel.LOW,
+            automation_action='simulate_verification_failure',
+            created_by=self.admin_user,
+            is_active=True
+        )
+        fail_inc = Incident.objects.create(
+            title='Fail verif incident',
+            description='Test verification fail',
+            category=Incident.Category.SERVER,
+            created_by=self.employee,
+            status=Incident.Status.APPROVED
+        )
+        fail_app = AutomationApproval.objects.create(
+            incident=fail_inc,
+            runbook=fail_rb,
+            requested_by=self.admin_user,
+            status=AutomationApproval.ApprovalStatus.APPROVED
+        )
+        fail_exec = AutomationExecution.objects.create(
+            approval=fail_app,
+            action_name='simulate_verification_failure',
+            status=AutomationExecution.ExecutionStatus.SUCCESS,
+            completed_at=timezone.now()
+        )
+
+        from automation.verification import verify_execution
+        verify_execution(fail_exec, actor=self.admin_user)
+        self.assertTrue(AuditLog.objects.filter(incident=fail_inc, event_type=AuditLog.EventType.VERIFICATION_FAILED).exists())
+        self.assertTrue(AuditLog.objects.filter(incident=fail_inc, event_type=AuditLog.EventType.INCIDENT_ESCALATED).exists())
+
+    # TEST 13 — Incident resolved audit
+    def test_13_incident_resolved_audit(self):
+        self.approval.status = AutomationApproval.ApprovalStatus.APPROVED
+        self.approval.save()
+        execution = AutomationExecution.objects.create(
+            approval=self.approval,
+            action_name='restart_nginx',
+            status=AutomationExecution.ExecutionStatus.SUCCESS,
+            completed_at=timezone.now()
+        )
+
+        from automation.verification import verify_execution
+        verify_execution(execution, actor=self.admin_user)
+        self.assertTrue(AuditLog.objects.filter(incident=self.incident, event_type=AuditLog.EventType.INCIDENT_RESOLVED).exists())
+        self.incident.refresh_from_db()
+        self.assertEqual(self.incident.status, Incident.Status.RESOLVED)
+
+    # TEST 14 — Employee cannot access audit page
+    def test_14_employee_cannot_access_audit_page(self):
+        client = Client()
+        client.login(username='employee_p8', password='employeepassword')
+        resp = client.get(reverse('audit_log_list'))
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('dashboard', resp.url)
+
+    # TEST 15 — Anonymous user cannot access audit page
+    def test_15_anonymous_user_cannot_access_audit_page(self):
+        client = Client()
+        resp = client.get(reverse('audit_log_list'))
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('login', resp.url)
+
+    # TEST 16 — Audit records cannot be edited
+    def test_16_audit_records_cannot_be_edited(self):
+        from django.urls import NoReverseMatch
+        with self.assertRaises(NoReverseMatch):
+            reverse('audit_log_edit', kwargs={'pk': 1})
+
+    # TEST 17 — Audit records cannot be deleted
+    def test_17_audit_records_cannot_be_deleted(self):
+        from django.urls import NoReverseMatch
+        with self.assertRaises(NoReverseMatch):
+            reverse('audit_log_delete', kwargs={'pk': 1})
+
+    # TEST 18 — Audit filtering
+    def test_18_audit_filtering(self):
+        client = Client()
+        client.login(username='admin_p8', password='adminpassword')
+
+        create_audit_log(incident=self.incident, event_type=AuditLog.EventType.INCIDENT_CREATED, message="Filtering test 1", actor=self.employee)
+        create_audit_log(incident=self.incident, event_type=AuditLog.EventType.VERIFICATION_PASSED, message="Filtering test 2", actor=self.admin_user)
+
+        resp = client.get(reverse('audit_log_list') + '?event_type=VERIFICATION_PASSED')
+        self.assertEqual(resp.status_code, 200)
+        logs = resp.context['page_obj']
+        for log in logs:
+            self.assertEqual(log.event_type, AuditLog.EventType.VERIFICATION_PASSED)
+
+    # TEST 19 — Audit search
+    def test_19_audit_search(self):
+        client = Client()
+        client.login(username='admin_p8', password='adminpassword')
+
+        unique_key = "UniqueSearchPhrase12345"
+        create_audit_log(incident=self.incident, event_type=AuditLog.EventType.AUTOMATION_COMPLETED, message=f"Output with {unique_key}", actor=self.admin_user)
+
+        resp = client.get(reverse('audit_log_list') + f'?q={unique_key}')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.context['total_count'], 1)
+        self.assertIn(unique_key, resp.context['page_obj'][0].message)
+
+    # TEST 20 — Audit pagination
+    def test_20_audit_pagination(self):
+        client = Client()
+        client.login(username='admin_p8', password='adminpassword')
+
+        for i in range(30):
+            create_audit_log(incident=self.incident, event_type=AuditLog.EventType.AUTOMATION_STARTED, message=f"Pagination entry #{i}", actor=self.admin_user)
+
+        resp_p1 = client.get(reverse('audit_log_list') + '?page=1')
+        self.assertEqual(resp_p1.status_code, 200)
+        self.assertEqual(len(resp_p1.context['page_obj'].object_list), 25)
+
+        resp_p2 = client.get(reverse('audit_log_list') + '?page=2')
+        self.assertEqual(resp_p2.status_code, 200)
+        self.assertTrue(len(resp_p2.context['page_obj'].object_list) >= 5)
+
+    # TEST 21 — Dashboard statistics
+    def test_21_dashboard_statistics(self):
+        client = Client()
+        client.login(username='admin_p8', password='adminpassword')
+
+        resp = client.get(reverse('admin_dashboard'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.context['total_incidents'], Incident.objects.count())
+        self.assertEqual(resp.context['pending_approvals'], AutomationApproval.objects.filter(status='PENDING').count())
+        self.assertEqual(resp.context['total_executions'], AutomationExecution.objects.count())
+        self.assertEqual(resp.context['verifications_passed'], VerificationResult.objects.filter(status='PASSED').count())
+        self.assertEqual(resp.context['total_audit_events'], AuditLog.objects.count())
+
+    # TEST 22 — No fake statistics
+    def test_22_no_fake_statistics(self):
+        client = Client()
+        client.login(username='admin_p8', password='adminpassword')
+
+        resp1 = client.get(reverse('admin_dashboard'))
+        init_incidents = resp1.context['total_incidents']
+
+        Incident.objects.create(
+            title='Dynamic incident for DB verification',
+            description='Testing dynamic metrics calculation.',
+            category=Incident.Category.SERVER,
+            created_by=self.employee
+        )
+
+        resp2 = client.get(reverse('admin_dashboard'))
+        self.assertEqual(resp2.context['total_incidents'], init_incidents + 1)
+
+    # TEST 23 — Incident timeline
+    def test_23_incident_timeline(self):
+        client = Client()
+        client.login(username='admin_p8', password='adminpassword')
+
+        resp = client.get(reverse('admin_incident_detail', kwargs={'pk': self.incident.pk}))
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('audit_logs', resp.context)
+        self.assertContains(resp, "Audit Timeline")
+
+    # TEST 24 — Audit chronological ordering
+    def test_24_audit_chronological_ordering(self):
+        client = Client()
+        client.login(username='admin_p8', password='adminpassword')
+
+        log1 = create_audit_log(incident=self.incident, event_type=AuditLog.EventType.AUTOMATION_STARTED, message="Step 1")
+        log2 = create_audit_log(incident=self.incident, event_type=AuditLog.EventType.AUTOMATION_COMPLETED, message="Step 2")
+
+        # Incident timeline: oldest to newest
+        inc_resp = client.get(reverse('admin_incident_detail', kwargs={'pk': self.incident.pk}))
+        inc_logs = list(inc_resp.context['audit_logs'])
+        self.assertLessEqual(inc_logs[0].created_at, inc_logs[-1].created_at)
+
+        # Global audit list: newest to oldest
+        audit_resp = client.get(reverse('audit_log_list'))
+        audit_logs = list(audit_resp.context['page_obj'].object_list)
+        self.assertGreaterEqual(audit_logs[0].created_at, audit_logs[-1].created_at)
+
+    # TEST 25 — Actor tracking
+    def test_25_actor_tracking(self):
+        log = create_audit_log(
+            incident=self.incident,
+            event_type=AuditLog.EventType.APPROVAL_APPROVED,
+            message="Action approved by human admin",
+            actor=self.admin_user
+        )
+        self.assertEqual(log.actor, self.admin_user)
+        self.assertEqual(log.actor_display, self.admin_user.username)
+
+    # TEST 26 — Anonymous/system actor
+    def test_26_anonymous_system_actor(self):
+        client = Client()
+        client.login(username='admin_p8', password='adminpassword')
+
+        sys_log = create_audit_log(
+            incident=self.incident,
+            event_type=AuditLog.EventType.AI_ANALYSIS_COMPLETED,
+            message="Automated retrieval process completed.",
+            actor=None
+        )
+        self.assertIsNone(sys_log.actor)
+        self.assertEqual(sys_log.actor_display, "System")
+
+        resp = client.get(reverse('audit_log_list'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "System")
+
+    # TEST 27 — Complete End-to-End Lifecycle Audit Trail
+    def test_27_complete_end_to_end_lifecycle_audit_trail(self):
+        # 1. Employee creates incident
+        emp_client = Client()
+        emp_client.login(username='employee_p8', password='employeepassword')
+
+        create_resp = emp_client.post(reverse('employee_incident_create'), {
+            'title': 'Nginx server unavailable',
+            'description': 'Users cannot access the website. The web server appears unavailable.',
+            'category': Incident.Category.SERVER,
+            'priority': Incident.Priority.HIGH,
+        })
+        self.assertEqual(create_resp.status_code, 302)
+
+        incident = Incident.objects.get(title='Nginx server unavailable')
+        self.assertTrue(AuditLog.objects.filter(incident=incident, event_type=AuditLog.EventType.INCIDENT_CREATED).exists())
+
+        # AI analysis events
+        self.assertTrue(AuditLog.objects.filter(incident=incident, event_type=AuditLog.EventType.AI_ANALYSIS_COMPLETED).exists())
+        self.assertTrue(AuditLog.objects.filter(incident=incident, event_type=AuditLog.EventType.RUNBOOK_RECOMMENDED).exists())
+
+        # 2. Admin requests approval
+        admin_client = Client()
+        admin_client.login(username='admin_p8', password='adminpassword')
+        req_resp = admin_client.post(reverse('admin_incident_request_approval', kwargs={'pk': incident.pk}))
+        self.assertEqual(req_resp.status_code, 302)
+        self.assertTrue(AuditLog.objects.filter(incident=incident, event_type=AuditLog.EventType.APPROVAL_REQUESTED).exists())
+
+        # 3. Admin approves
+        approval = incident.approvals.first()
+        app_resp = admin_client.post(reverse('approve_action', kwargs={'pk': approval.pk}), {'reason': 'Approved for automated fix'})
+        self.assertEqual(app_resp.status_code, 302)
+        self.assertTrue(AuditLog.objects.filter(incident=incident, event_type=AuditLog.EventType.APPROVAL_APPROVED).exists())
+
+        # 4. Admin executes mock action
+        exec_resp = admin_client.post(reverse('admin_approval_execute', kwargs={'pk': approval.pk}))
+        self.assertEqual(exec_resp.status_code, 302)
+        self.assertTrue(AuditLog.objects.filter(incident=incident, event_type=AuditLog.EventType.AUTOMATION_STARTED).exists())
+        self.assertTrue(AuditLog.objects.filter(incident=incident, event_type=AuditLog.EventType.AUTOMATION_COMPLETED).exists())
+
+        # 5. Admin verifies execution
+        approval.refresh_from_db()
+        verif_resp = admin_client.post(reverse('admin_execution_verify', kwargs={'pk': approval.execution.pk}))
+        self.assertEqual(verif_resp.status_code, 302)
+        self.assertTrue(AuditLog.objects.filter(incident=incident, event_type=AuditLog.EventType.VERIFICATION_STARTED).exists())
+        self.assertTrue(AuditLog.objects.filter(incident=incident, event_type=AuditLog.EventType.VERIFICATION_PASSED).exists())
+        self.assertTrue(AuditLog.objects.filter(incident=incident, event_type=AuditLog.EventType.INCIDENT_RESOLVED).exists())
+
+        # Incident status is RESOLVED
+        incident.refresh_from_db()
+        self.assertEqual(incident.status, Incident.Status.RESOLVED)
+
+        # Audit page shows all events
+        audit_resp = admin_client.get(reverse('audit_log_list') + f'?incident={incident.incident_number}')
+        self.assertEqual(audit_resp.status_code, 200)
+        self.assertGreaterEqual(audit_resp.context['total_count'], 7)
+
+    # TEST 28 — Failure End-to-End Audit Trail
+    def test_28_failure_end_to_end_audit_trail(self):
+        failing_rb = Runbook.objects.create(
+            title='Failing Verification Service',
+            category=Incident.Category.SERVER,
+            description='Runbook that simulates verification failure.',
+            symptoms='Fail',
+            steps='Fail step',
+            risk_level=Runbook.RiskLevel.MEDIUM,
+            automation_action='simulate_verification_failure',
+            created_by=self.admin_user,
+            is_active=True
+        )
+
+        failing_inc = Incident.objects.create(
+            title='Critical service down with verification failure',
+            description='Service is broken.',
+            category=Incident.Category.SERVER,
+            priority=Incident.Priority.HIGH,
+            created_by=self.employee,
+            status=Incident.Status.RECOMMENDATION_READY
+        )
+        RunbookRecommendation.objects.create(incident=failing_inc, runbook=failing_rb, match_score=0.95)
+
+        admin_client = Client()
+        admin_client.login(username='admin_p8', password='adminpassword')
+
+        # Request approval & approve
+        admin_client.post(reverse('admin_incident_request_approval', kwargs={'pk': failing_inc.pk}))
+        approval = failing_inc.approvals.first()
+        admin_client.post(reverse('approve_action', kwargs={'pk': approval.pk}))
+
+        # Execute
+        admin_client.post(reverse('admin_approval_execute', kwargs={'pk': approval.pk}))
+
+        # Verify (this should fail)
+        approval.refresh_from_db()
+        admin_client.post(reverse('admin_execution_verify', kwargs={'pk': approval.execution.pk}))
+
+        # Verification failed & incident escalated
+        self.assertTrue(AuditLog.objects.filter(incident=failing_inc, event_type=AuditLog.EventType.VERIFICATION_FAILED).exists())
+        self.assertTrue(AuditLog.objects.filter(incident=failing_inc, event_type=AuditLog.EventType.INCIDENT_ESCALATED).exists())
+
+        # Incident is NOT resolved
+        failing_inc.refresh_from_db()
+        self.assertNotEqual(failing_inc.status, Incident.Status.RESOLVED)
+        self.assertEqual(failing_inc.status, Incident.Status.IN_PROGRESS)
+
 
 

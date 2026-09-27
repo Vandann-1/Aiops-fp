@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block title %}Audit & Monitoring Console - AIOps Console{% endblock %}
+{% block page_title %}Audit & Monitoring Console{% endblock %}
+
+{% block content %}
+<!-- Overview Banner -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="p-4 bg-white rounded-4 border shadow-sm d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+            <div>
+                <h4 class="mb-1 text-dark fw-bold"><i class="bi bi-shield-shaded text-primary me-2"></i>Audit & Monitoring Console</h4>
+                <p class="text-muted mb-0 small">Comprehensive chronological audit trail of incident lifecycles, local NLP runbook recommendations, human approvals, controlled mock executions, and verification outcomes.</p>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-primary-subtle text-primary border px-3 py-2 fw-semibold">
+                    <i class="bi bi-database me-1"></i> {{ total_count }} Logged Events
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters and Search Card -->
+<div class="card card-custom shadow-sm mb-4">
+    <div class="card-header bg-white py-3">
+        <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-funnel me-2 text-primary"></i>Audit Trail Filter & Search</h6>
+    </div>
+    <div class="card-body p-4">
+        <form method="get" action="{% url 'audit_log_list' %}">
+            <div class="row g-3">
+                <!-- Search Keyword -->
+                <div class="col-12 col-md-4">
+                    <label class="form-label small fw-semibold text-secondary">Search Query</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                        <input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="Search message, INC number, user...">
+                    </div>
+                </div>
+
+                <!-- Event Type Filter -->
+                <div class="col-12 col-sm-6 col-md-3">
+                    <label class="form-label small fw-semibold text-secondary">Event Type</label>
+                    <select name="event_type" class="form-select form-select-sm">
+                        <option value="">All Events</option>
+                        {% for code, label in event_types %}
+                            <option value="{{ code }}" {% if current_event_type == code %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Incident Filter -->
+                <div class="col-12 col-sm-6 col-md-2">
+                    <label class="form-label small fw-semibold text-secondary">Incident #</label>
+                    <input type="text" name="incident" value="{{ current_incident }}" class="form-control form-control-sm" placeholder="e.g. INC-0001">
+                </div>
+
+                <!-- Actor Filter -->
+                <div class="col-12 col-sm-6 col-md-2">
+                    <label class="form-label small fw-semibold text-secondary">Actor</label>
+                    <input type="text" name="actor" value="{{ current_actor }}" class="form-control form-control-sm" placeholder="Username or 'System'">
+                </div>
+
+                <!-- Date Filter -->
+                <div class="col-12 col-sm-6 col-md-1">
+                    <label class="form-label small fw-semibold text-secondary">Date</label>
+                    <select name="date" class="form-select form-select-sm">
+                        <option value="">All</option>
+                        <option value="today" {% if current_date == 'today' %}selected{% endif %}>Today</option>
+                        <option value="yesterday" {% if current_date == 'yesterday' %}selected{% endif %}>Yesterday</option>
+                        <option value="week" {% if current_date == 'week' %}selected{% endif %}>7 Days</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex justify-content-end gap-2 mt-3 pt-2 border-top">
+                {% if search_query or current_event_type or current_incident or current_actor or current_date %}
+                    <a href="{% url 'audit_log_list' %}" class="btn btn-sm btn-outline-secondary px-3">
+                        <i class="bi bi-x-circle me-1"></i> Clear Filters
+                    </a>
+                {% endif %}
+                <button type="submit" class="btn btn-sm btn-primary px-4 fw-semibold">
+                    <i class="bi bi-filter me-1"></i> Apply Filters
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Audit Trail Table -->
+<div class="card card-custom shadow-sm mb-4">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-journal-text me-2 text-primary"></i>Audit Log Entries (Reverse Chronological)</h6>
+        <span class="text-muted small">Showing {{ page_obj.start_index|default:0 }} - {{ page_obj.end_index|default:0 }} of {{ total_count }}</span>
+    </div>
+    <div class="card-body p-0">
+        {% if page_obj.object_list %}
+            <div class="table-responsive">
+                <table class="table align-middle table-hover mb-0" style="font-size: 0.85rem;">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="px-3 py-2.5" style="width: 170px;">Timestamp</th>
+                            <th class="py-2.5" style="width: 130px;">Incident</th>
+                            <th class="py-2.5" style="width: 200px;">Event</th>
+                            <th class="py-2.5" style="width: 120px;">Actor</th>
+                            <th class="px-3 py-2.5">Message / Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in page_obj %}
+                            <tr class="border-bottom">
+                                <td class="px-3 py-2 text-nowrap text-secondary font-monospace" style="font-size: 0.78rem;">
+                                    <i class="bi bi-clock me-1 text-muted"></i>{{ log.created_at|date:"d M Y • H:i:s" }}
+                                </td>
+                                <td class="py-2 fw-bold">
+                                    <a href="{% url 'admin_incident_detail' log.incident.pk %}" class="text-primary text-decoration-none">
+                                        {{ log.incident.incident_number }}
+                                    </a>
+                                </td>
+                                <td class="py-2">
+                                    <span class="badge {{ log.badge_class }} px-2 py-1" style="font-size: 0.72rem; letter-spacing: 0.02em;">
+                                        {{ log.get_event_type_display }}
+                                    </span>
+                                </td>
+                                <td class="py-2">
+                                    {% if log.actor %}
+                                        <span class="badge bg-light text-dark border">
+                                            <i class="bi bi-person me-1"></i>{{ log.actor.username }}
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary-subtle text-secondary border">
+                                            <i class="bi bi-gear-wide-connected me-1"></i>System
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-3 py-2">
+                                    <div class="text-dark">{{ log.message }}</div>
+                                    {% if log.metadata %}
+                                        <div class="mt-1 small text-muted font-monospace" style="font-size: 0.72rem;">
+                                            {% for k, v in log.metadata.items %}
+                                                <span class="badge bg-light text-secondary border me-1">{{ k }}: {{ v }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination Controls -->
+            {% if page_obj.has_other_pages %}
+                <div class="p-3 bg-light border-top d-flex justify-content-between align-items-center">
+                    <span class="small text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                    <nav aria-label="Audit log pagination">
+                        <ul class="pagination pagination-sm mb-0">
+                            {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&event_type={{ current_event_type }}&incident={{ current_incident }}&actor={{ current_actor }}&date={{ current_date }}">
+                                        &laquo; Previous
+                                    </a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled"><span class="page-link">&laquo; Previous</span></li>
+                            {% endif %}
+
+                            {% for num in page_obj.paginator.page_range %}
+                                {% if num == page_obj.number %}
+                                    <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ num }}&q={{ search_query }}&event_type={{ current_event_type }}&incident={{ current_incident }}&actor={{ current_actor }}&date={{ current_date }}">{{ num }}</a>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&event_type={{ current_event_type }}&incident={{ current_incident }}&actor={{ current_actor }}&date={{ current_date }}">
+                                        Next &raquo;
+                                    </a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled"><span class="page-link">Next &raquo;</span></li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="py-5 text-center">
+                <i class="bi bi-shield-x text-muted" style="font-size: 2.5rem;"></i>
+                <h6 class="text-secondary mt-3 fw-medium">No audit events found.</h6>
+                <p class="text-muted small mb-0">Try clearing or adjusting your search filters above.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

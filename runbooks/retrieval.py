@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 # Configurable minimum match threshold. Similarity score must be >= 0.20 to recommend.
 MIN_MATCH_SCORE = 0.20
 
-def retrieve_best_runbook(incident):
+def retrieve_best_runbook(incident, actor=None):
     """
     NLP Retrieval Service.
     Compares the Incident (title, description, category) against the active Runbook Knowledge Base.
@@ -25,6 +25,17 @@ def retrieve_best_runbook(incident):
         active_runbooks = list(Runbook.objects.filter(is_active=True))
         if not active_runbooks:
             logger.warning("No active runbooks found in the database. Skipping retrieval.")
+            try:
+                from automation.audit import create_audit_log
+                from automation.models import AuditLog
+                create_audit_log(
+                    incident=incident,
+                    event_type=AuditLog.EventType.AI_ANALYSIS_COMPLETED,
+                    message="Local NLP analysis completed. No active runbooks available.",
+                    actor=actor
+                )
+            except Exception:
+                pass
             return {
                 "runbook": None,
                 "score": 0.0,
@@ -67,10 +78,43 @@ def retrieve_best_runbook(incident):
         # Keep top 3 alternative matches for diagnostic output
         top_matches = matches[:3]
 
+        # Phase 8: Record AI Analysis Completed audit event
+        try:
+            from automation.audit import create_audit_log
+            from automation.models import AuditLog
+            create_audit_log(
+                incident=incident,
+                event_type=AuditLog.EventType.AI_ANALYSIS_COMPLETED,
+                message="Local NLP analysis completed for the incident.",
+                actor=actor
+            )
+        except Exception as audit_err:
+            logger.warning(f"Could not record AI_ANALYSIS_COMPLETED audit: {str(audit_err)}")
+
         # 9. Evaluate best match against threshold
         if matches and matches[0][1] >= MIN_MATCH_SCORE:
             best_match, best_score = matches[0]
             logger.info(f"AI retrieval successfully matched incident to {best_match.runbook_number} (Score: {best_score:.4f})")
+            
+            # Phase 8: Record Runbook Recommended audit event
+            try:
+                from automation.audit import create_audit_log
+                from automation.models import AuditLog
+                create_audit_log(
+                    incident=incident,
+                    event_type=AuditLog.EventType.RUNBOOK_RECOMMENDED,
+                    message=f"Runbook '{best_match.title}' recommended with a match score of {best_score * 100:.1f}%.",
+                    actor=actor,
+                    metadata={
+                        "runbook_id": best_match.id,
+                        "runbook_number": best_match.runbook_number,
+                        "runbook_title": best_match.title,
+                        "match_score": best_score
+                    }
+                )
+            except Exception as audit_err:
+                logger.warning(f"Could not record RUNBOOK_RECOMMENDED audit: {str(audit_err)}")
+
             return {
                 "runbook": best_match,
                 "score": best_score,

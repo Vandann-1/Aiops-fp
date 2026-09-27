@@ -11,5 +11,6 @@ urlpatterns = [
     path('admin-portal/approvals/<int:pk>/execution/', views.execution_detail, name='execution_detail'),
     path('admin-portal/executions/<int:pk>/verify/', views.admin_execution_verify, name='admin_execution_verify'),
     path('admin-portal/approvals/<int:pk>/verify/', views.admin_approval_verify, name='admin_approval_verify'),
+    path('admin-portal/audit/', views.admin_audit_log_list, name='audit_log_list'),
 ]
 

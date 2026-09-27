@@ -152,6 +152,19 @@ def verify_execution(execution, actor=None):
 
     # 10. Perform simulated verification lookup
     action_name = execution.action_name
+
+    # Phase 8: Record VERIFICATION_STARTED audit log
+    from automation.audit import create_audit_log
+    from automation.models import AuditLog
+    effective_actor = actor or approval.reviewed_by or approval.requested_by
+    create_audit_log(
+        incident=incident,
+        event_type=AuditLog.EventType.VERIFICATION_STARTED,
+        message=f"Simulated verification started for action '{action_name}'.",
+        actor=effective_actor,
+        metadata={"action_name": action_name}
+    )
+
     verification_func = SAFE_VERIFICATIONS.get(action_name)
     if not verification_func:
         # Fallback safe simulation check if action is not explicitly listed in verifications
@@ -191,9 +204,25 @@ def verify_execution(execution, actor=None):
         # Log timeline event
         IncidentActivity.objects.create(
             incident=incident,
-            actor=actor or approval.reviewed_by or approval.requested_by,
+            actor=effective_actor,
             action='AUTOMATION_VERIFIED',
             description="Automation execution verified successfully. Incident resolved."
+        )
+
+        # Phase 8: Record audit logs
+        create_audit_log(
+            incident=incident,
+            event_type=AuditLog.EventType.VERIFICATION_PASSED,
+            message="Automation execution verified successfully.",
+            actor=effective_actor,
+            metadata={"action_name": action_name, "message": verification_msg}
+        )
+        create_audit_log(
+            incident=incident,
+            event_type=AuditLog.EventType.INCIDENT_RESOLVED,
+            message="Incident resolved after successful automation verification.",
+            actor=effective_actor,
+            metadata={"action_name": action_name}
         )
     else:
         # Keep incident open / in progress
@@ -203,9 +232,25 @@ def verify_execution(execution, actor=None):
         # Log timeline event
         IncidentActivity.objects.create(
             incident=incident,
-            actor=actor or approval.reviewed_by or approval.requested_by,
+            actor=effective_actor,
             action='VERIFICATION_FAILED',
             description="Automation verification failed. Manual investigation required."
+        )
+
+        # Phase 8: Record audit logs
+        create_audit_log(
+            incident=incident,
+            event_type=AuditLog.EventType.VERIFICATION_FAILED,
+            message="Automation verification failed. Manual investigation required.",
+            actor=effective_actor,
+            metadata={"action_name": action_name, "message": verification_msg}
+        )
+        create_audit_log(
+            incident=incident,
+            event_type=AuditLog.EventType.INCIDENT_ESCALATED,
+            message="Incident requires manual investigation after failed automation verification.",
+            actor=effective_actor,
+            metadata={"action_name": action_name}
         )
 
     return is_passed, verification, verification_msg

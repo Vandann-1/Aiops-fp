@@ -6,9 +6,13 @@ from django.utils import timezone
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponseNotAllowed
 
+from datetime import datetime, timedelta
+from django.core.paginator import Paginator
+from django.db.models import Q
+
 from accounts.decorators import it_admin_required
 from incidents.models import Incident, IncidentActivity
-from .models import AutomationApproval, AutomationExecution
+from .models import AutomationApproval, AutomationExecution, VerificationResult, AuditLog
 from automation.executor import execute_approved_action
 
 logger = logging.getLogger(__name__)
@@ -57,6 +61,17 @@ def admin_incident_request_approval(request, pk):
         actor=request.user,
         action='APPROVAL_REQUESTED',
         description=f"Approval requested by admin for {runbook.runbook_number} — {runbook.title}."
+    )
+
+    # Phase 8: Record audit log
+    from automation.audit import create_audit_log
+    from automation.models import AuditLog
+    create_audit_log(
+        incident=incident,
+        event_type=AuditLog.EventType.APPROVAL_REQUESTED,
+        message=f"Automation approval requested for runbook '{runbook.title}'.",
+        actor=request.user,
+        metadata={"approval_id": approval.id, "runbook_id": runbook.id, "runbook_title": runbook.title}
     )
 
     messages.success(request, f"Approval request submitted for runbook {runbook.runbook_number}.")
@@ -144,6 +159,17 @@ def approve_action(request, pk):
         description=f"Automation action approved by admin for {approval.runbook.runbook_number} — {approval.runbook.title}."
     )
 
+    # Phase 8: Record audit log
+    from automation.audit import create_audit_log
+    from automation.models import AuditLog
+    create_audit_log(
+        incident=incident,
+        event_type=AuditLog.EventType.APPROVAL_APPROVED,
+        message="Automation approval approved.",
+        actor=request.user,
+        metadata={"approval_id": approval.id, "runbook_id": approval.runbook.id, "notes": approval.reason}
+    )
+
     messages.success(request, "Action approved. Automation execution will be handled by the next phase.")
     
     referer = request.META.get('HTTP_REFERER', '')
@@ -187,6 +213,20 @@ def reject_action(request, pk):
         actor=request.user,
         action='APPROVAL_REJECTED',
         description=f"Automation action rejected by admin. Reason: {reason}"
+    )
+
+    # Phase 8: Record audit log
+    from automation.audit import create_audit_log
+    from automation.models import AuditLog
+    rej_msg = "Automation approval rejected."
+    if reason:
+        rej_msg += f" Reason: {reason}"
+    create_audit_log(
+        incident=incident,
+        event_type=AuditLog.EventType.APPROVAL_REJECTED,
+        message=rej_msg,
+        actor=request.user,
+        metadata={"approval_id": approval.id, "runbook_id": approval.runbook.id, "reason": reason}
     )
 
     messages.warning(request, "Automation was not approved. Manual investigation may be required.")
@@ -285,4 +325,81 @@ def admin_approval_verify(request, pk):
         return redirect('approval_detail', pk=approval.pk)
 
     return admin_execution_verify(request, approval.execution.pk)
+
+
+@login_required
+@it_admin_required
+def admin_audit_log_list(request):
+    """
+    Phase 8: Audit & Monitoring Admin Console.
+    Displays a reverse-chronological list of system audit events with search, filters, and pagination.
+    """
+    logs_qs = AuditLog.objects.select_related('incident', 'actor').order_by('-created_at')
+
+    # 1. Event Type filter
+    event_type = request.GET.get('event_type', '').strip()
+    if event_type:
+        logs_qs = logs_qs.filter(event_type=event_type)
+
+    # 2. Incident filter (number or title)
+    incident_query = request.GET.get('incident', '').strip()
+    if incident_query:
+        logs_qs = logs_qs.filter(
+            Q(incident__incident_number__icontains=incident_query) |
+            Q(incident__title__icontains=incident_query)
+        )
+
+    # 3. Actor filter (username or System)
+    actor_query = request.GET.get('actor', '').strip()
+    if actor_query:
+        if actor_query.lower() == 'system':
+            logs_qs = logs_qs.filter(actor__isnull=True)
+        else:
+            logs_qs = logs_qs.filter(actor__username__icontains=actor_query)
+
+    # 4. Date filter
+    date_filter = request.GET.get('date', '').strip()
+    if date_filter:
+        now = timezone.now()
+        if date_filter == 'today':
+            logs_qs = logs_qs.filter(created_at__date=now.date())
+        elif date_filter == 'yesterday':
+            logs_qs = logs_qs.filter(created_at__date=(now - timedelta(days=1)).date())
+        elif date_filter == 'week':
+            logs_qs = logs_qs.filter(created_at__date__gte=(now - timedelta(days=7)).date())
+        else:
+            try:
+                parsed_d = datetime.strptime(date_filter, '%Y-%m-%d').date()
+                logs_qs = logs_qs.filter(created_at__date=parsed_d)
+            except ValueError:
+                pass
+
+    # 5. Search query (across message, incident number/title, actor username)
+    search_q = request.GET.get('q', '').strip()
+    if search_q:
+        logs_qs = logs_qs.filter(
+            Q(message__icontains=search_q) |
+            Q(incident__incident_number__icontains=search_q) |
+            Q(incident__title__icontains=search_q) |
+            Q(actor__username__icontains=search_q)
+        )
+
+    total_count = logs_qs.count()
+
+    # Pagination: 25 items per page
+    paginator = Paginator(logs_qs, 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'admin_portal/audit_log_list.html', {
+        'page_obj': page_obj,
+        'event_types': AuditLog.EventType.choices,
+        'current_event_type': event_type,
+        'current_incident': incident_query,
+        'current_actor': actor_query,
+        'current_date': date_filter,
+        'search_query': search_q,
+        'total_count': total_count,
+    })
+
 

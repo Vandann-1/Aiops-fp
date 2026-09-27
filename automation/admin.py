@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import AutomationApproval, AutomationExecution, VerificationResult
+from .models import AutomationApproval, AutomationExecution, VerificationResult, AuditLog
 
 class AutomationApprovalAdmin(admin.ModelAdmin):
     list_display = (
@@ -47,7 +47,42 @@ class VerificationResultAdmin(admin.ModelAdmin):
         'message'
     )
 
+class AuditLogAdmin(admin.ModelAdmin):
+    list_display = (
+        'created_at',
+        'incident',
+        'event_type',
+        'actor',
+        'message'
+    )
+    list_filter = ('event_type', 'created_at')
+    search_fields = (
+        'incident__incident_number',
+        'incident__title',
+        'actor__username',
+        'message'
+    )
+    readonly_fields = (
+        'incident',
+        'actor',
+        'event_type',
+        'message',
+        'metadata',
+        'created_at'
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
 admin.site.register(AutomationApproval, AutomationApprovalAdmin)
 admin.site.register(AutomationExecution, AutomationExecutionAdmin)
 admin.site.register(VerificationResult, VerificationResultAdmin)
+admin.site.register(AuditLog, AuditLogAdmin)
+
 

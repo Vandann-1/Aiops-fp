@@ -29,6 +29,9 @@ def employee_dashboard(request):
 @login_required
 @it_admin_required
 def admin_dashboard(request):
+    from runbooks.models import Runbook
+    from automation.models import AutomationApproval, AutomationExecution, VerificationResult, AuditLog
+
     all_incidents = Incident.objects.all()
     
     # Unresolved critical incidents
@@ -38,20 +41,65 @@ def admin_dashboard(request):
         status__in=[Incident.Status.RESOLVED, Incident.Status.REJECTED]
     )[:5]
 
-    from runbooks.models import Runbook
+    total_incidents = all_incidents.count()
+    open_incidents = all_incidents.filter(status=Incident.Status.OPEN).count()
+    critical_incidents = all_incidents.filter(priority=Incident.Priority.CRITICAL).count()
+    resolved_incidents = all_incidents.filter(status=Incident.Status.RESOLVED).count()
+
     active_runbooks = Runbook.objects.filter(is_active=True).count()
     inactive_runbooks = Runbook.objects.filter(is_active=False).count()
 
+    # Phase 5: Pending approvals
+    pending_approvals = AutomationApproval.objects.filter(status=AutomationApproval.ApprovalStatus.PENDING).count()
+
+    # Phase 6 & 8: Automation Execution metrics
+    successful_executions = AutomationExecution.objects.filter(status=AutomationExecution.ExecutionStatus.SUCCESS).count()
+    failed_executions = AutomationExecution.objects.filter(status=AutomationExecution.ExecutionStatus.FAILED).count()
+    blocked_executions = AutomationExecution.objects.filter(status=AutomationExecution.ExecutionStatus.BLOCKED).count()
+    total_executions = AutomationExecution.objects.count()
+
+    # Success rate
+    completed_executions = successful_executions + failed_executions
+    if completed_executions > 0:
+        automation_success_rate = round((successful_executions / completed_executions) * 100, 1)
+    else:
+        automation_success_rate = 0.0
+
+    # Phase 7 & 8: Verification metrics
+    verifications_passed = VerificationResult.objects.filter(status=VerificationResult.Status.PASSED).count()
+    verifications_failed = VerificationResult.objects.filter(status=VerificationResult.Status.FAILED).count()
+    total_verifications = VerificationResult.objects.count()
+
+    # Phase 8: Audit logs & Recent Activity
+    total_audit_events = AuditLog.objects.count()
+    recent_audit_events = AuditLog.objects.select_related('incident', 'actor').order_by('-created_at')[:8]
+
     context = {
-        'total_incidents': all_incidents.count(),
-        'open_incidents': all_incidents.filter(status=Incident.Status.OPEN).count(),
-        'critical_incidents': all_incidents.filter(priority=Incident.Priority.CRITICAL).count(),
-        'resolved_incidents': all_incidents.filter(status=Incident.Status.RESOLVED).count(),
-        'pending_approvals': 0,  # Reserved for Phase 5
+        'total_incidents': total_incidents,
+        'open_incidents': open_incidents,
+        'critical_incidents': critical_incidents,
+        'resolved_incidents': resolved_incidents,
+        'pending_approvals': pending_approvals,
         'active_runbooks': active_runbooks,
         'inactive_runbooks': inactive_runbooks,
         'recent_incidents': all_incidents[:5],
-        'unresolved_critical': unresolved_critical
+        'unresolved_critical': unresolved_critical,
+
+        # Automation Overview
+        'successful_executions': successful_executions,
+        'failed_executions': failed_executions,
+        'blocked_executions': blocked_executions,
+        'total_executions': total_executions,
+        'automation_success_rate': automation_success_rate,
+
+        # Verification Monitoring
+        'verifications_passed': verifications_passed,
+        'verifications_failed': verifications_failed,
+        'total_verifications': total_verifications,
+
+        # Audit & Monitoring
+        'total_audit_events': total_audit_events,
+        'recent_audit_events': recent_audit_events,
     }
     return render(request, 'admin_portal/dashboard.html', context)
 
@@ -279,11 +327,13 @@ def admin_critical_incidents(request):
 def admin_incident_detail(request, pk):
     incident = get_object_or_404(Incident, pk=pk)
     activities = incident.activities.all().order_by('-created_at')
+    audit_logs = incident.audit_logs.all().select_related('actor').order_by('created_at')
     form = IncidentAdminUpdateForm(instance=incident)
     
     return render(request, 'admin_portal/incident_detail.html', {
         'incident': incident,
         'activities': activities,
+        'audit_logs': audit_logs,
         'form': form
     })
 
@@ -348,7 +398,7 @@ def admin_incident_analyze(request, pk):
             description="AI retrieval engine manually re-run by admin."
         )
 
-        result = retrieve_best_runbook(incident)
+        result = retrieve_best_runbook(incident, actor=request.user)
         best_runbook = result['runbook']
         best_score = result['score']
 

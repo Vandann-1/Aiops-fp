@@ -225,4 +225,136 @@
         </div>
     </div>
 </div>
+
+<!-- Phase 8: Automation & Verification Monitoring Overview -->
+<div class="row g-4 mt-1 mb-4">
+    <div class="col-12 col-md-6 col-lg-3">
+        <div class="p-3 bg-white rounded-3 border shadow-sm h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-secondary small fw-bold text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.04em;">Automation Executions</span>
+                <span class="badge bg-primary">{{ total_executions }}</span>
+            </div>
+            <div class="d-flex align-items-baseline gap-2 mb-1">
+                <h4 class="mb-0 fw-bold text-success">{{ successful_executions }}</h4>
+                <span class="text-muted small">Successful</span>
+            </div>
+            <div class="small text-muted d-flex justify-content-between mt-2 pt-1 border-top">
+                <span>Failed: <strong class="text-danger">{{ failed_executions }}</strong></span>
+                <span>Blocked: <strong class="text-secondary">{{ blocked_executions }}</strong></span>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6 col-lg-3">
+        <div class="p-3 bg-white rounded-3 border shadow-sm h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-secondary small fw-bold text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.04em;">Automation Success Rate</span>
+                <span class="badge bg-info-subtle text-info border">Metric</span>
+            </div>
+            <div class="d-flex align-items-baseline gap-2 mb-1">
+                <h4 class="mb-0 fw-bold text-primary">{{ automation_success_rate }}%</h4>
+            </div>
+            <div class="small text-muted mt-2 pt-1 border-top">
+                Based on {{ total_executions }} completed execution attempts
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6 col-lg-3">
+        <div class="p-3 bg-white rounded-3 border shadow-sm h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-secondary small fw-bold text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.04em;">Verification Checks</span>
+                <span class="badge bg-secondary">{{ total_verifications }}</span>
+            </div>
+            <div class="d-flex align-items-baseline gap-2 mb-1">
+                <h4 class="mb-0 fw-bold text-success">{{ verifications_passed }}</h4>
+                <span class="text-muted small">Passed &amp; Resolved</span>
+            </div>
+            <div class="small text-muted mt-2 pt-1 border-top">
+                Failures / Escalations: <strong class="text-danger">{{ verifications_failed }}</strong>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6 col-lg-3">
+        <div class="p-3 bg-white rounded-3 border shadow-sm h-100 d-flex flex-column justify-content-between">
+            <div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-secondary small fw-bold text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.04em;">Audit Trail</span>
+                    <span class="badge bg-success-subtle text-success border">Active</span>
+                </div>
+                <h4 class="mb-0 fw-bold text-dark">{{ total_audit_events }}</h4>
+                <div class="small text-muted">System-wide logged events</div>
+            </div>
+            <div class="mt-2 pt-2 border-top">
+                <a href="{% url 'audit_log_list' %}" class="btn btn-sm btn-outline-primary w-100 py-1 fw-semibold" style="font-size: 0.78rem;">
+                    <i class="bi bi-shield-shaded me-1"></i> View Audit &amp; Monitoring
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Phase 8: Recent Audit Activity -->
+<div class="row">
+    <div class="col-12">
+        <div class="card card-custom shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                <h5 class="mb-0 fw-semibold text-dark"><i class="bi bi-shield-shaded text-primary me-2"></i>Recent Audit Activity</h5>
+                <a href="{% url 'audit_log_list' %}" class="btn btn-sm btn-outline-primary fw-semibold px-3">
+                    <i class="bi bi-list-ul me-1"></i> View Full Audit Log
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if recent_audit_events %}
+                    <div class="table-responsive">
+                        <table class="table align-middle table-hover mb-0" style="font-size: 0.85rem;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="px-3 py-2" style="width: 170px;">Time</th>
+                                    <th class="py-2" style="width: 130px;">Incident</th>
+                                    <th class="py-2" style="width: 190px;">Event</th>
+                                    <th class="py-2" style="width: 130px;">Actor</th>
+                                    <th class="px-3 py-2">Message</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for event in recent_audit_events %}
+                                    <tr class="border-bottom">
+                                        <td class="px-3 py-2 text-muted font-monospace" style="font-size: 0.78rem;">
+                                            {{ event.created_at|date:"d M • H:i:s" }}
+                                        </td>
+                                        <td class="py-2 fw-bold">
+                                            <a href="{% url 'admin_incident_detail' event.incident.pk %}" class="text-primary text-decoration-none">
+                                                {{ event.incident.incident_number }}
+                                            </a>
+                                        </td>
+                                        <td class="py-2">
+                                            <span class="badge {{ event.badge_class }}" style="font-size: 0.7rem;">
+                                                {{ event.get_event_type_display }}
+                                            </span>
+                                        </td>
+                                        <td class="py-2 text-dark">
+                                            {% if event.actor %}
+                                                <span class="badge bg-light text-dark border">{{ event.actor.username }}</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary-subtle text-secondary border">System</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="px-3 py-2 text-dark text-truncate" style="max-width: 450px;">
+                                            {{ event.message }}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="py-4 text-center">
+                        <i class="bi bi-clock-history text-muted" style="font-size: 2rem;"></i>
+                        <h6 class="text-secondary mt-2 fw-medium">No audit events recorded yet.</h6>
+                        <p class="text-muted small mb-0">System events will appear here as incidents and automations are processed.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

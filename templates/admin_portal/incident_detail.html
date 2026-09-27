@@ -434,6 +434,40 @@
             </div>
         </div>
 
+        <!-- Phase 8: Audit Timeline Card -->
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-shield-shaded text-primary me-2"></i>Audit Timeline</h5>
+                <span class="badge bg-secondary-subtle text-secondary small">Oldest &rarr; Newest</span>
+            </div>
+            <div class="card-body">
+                {% if audit_logs %}
+                    <ul class="timeline-feed mb-0">
+                        {% for log in audit_logs %}
+                            <li class="timeline-feed-item">
+                                <div class="timeline-time font-monospace text-muted" style="font-size: 0.72rem;">
+                                    {{ log.created_at|date:"d M • H:i:s" }}
+                                </div>
+                                <div class="d-flex align-items-center gap-1.5 my-1">
+                                    <span class="badge {{ log.badge_class }} py-0.5 px-2" style="font-size: 0.65rem;">
+                                        {{ log.get_event_type_display }}
+                                    </span>
+                                    <span class="small text-muted" style="font-size: 0.72rem;">
+                                        by {% if log.actor %}<strong>{{ log.actor.username }}</strong>{% else %}<em>System</em>{% endif %}
+                                    </span>
+                                </div>
+                                <div class="timeline-desc text-dark small" style="font-size: 0.8rem; line-height: 1.4;">
+                                    {{ log.message }}
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted small text-center mb-0">No audit events logged.</p>
+                {% endif %}
+            </div>
+        </div>
+
         <!-- Activity Timeline Card -->
         <div class="card card-custom shadow-sm">
             <div class="card-header bg-white">
