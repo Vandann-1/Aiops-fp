@@ -1,5 +1,22 @@
-Django==6.0.7
-asgiref==3.12.1
-sqlparse==0.5.5
-tzdata==2026.3
-scikit-learn==1.6.1
+# AIOps Service Desk — Python Dependencies
+# Target Python Version: Python 3.11+ / 3.12 / 3.13
+# Note: Zero external AI APIs (no OpenAI, no Gemini, no LangChain). Air-gapped local NLP only.
+
+# Core Web Framework
+Django>=6.0.0,<6.1.0        # High-level Python web framework providing MVC structure, ORM, and auth
+
+# Async Server Gateway Interface
+asgiref>=3.8.0,<4.0.0       # Standard ASGI library for Django asynchronous request handling
+
+# SQL Parsing Engine
+sqlparse>=0.5.0,<0.6.0      # Non-validating SQL parser used by Django database backend
+
+# Timezone Database
+tzdata>=2024.1              # IANA timezone database definitions for accurate UTC timestamp calculations
+
+# Local NLP & Machine Learning Engine
+scikit-learn>=1.6.0,<1.7.0  # TF-IDF vectorization and cosine similarity calculations for runbook retrieval
+numpy>=1.26.0,<2.3.0        # Numerical array and matrix operations supporting scikit-learn
+scipy>=1.13.0,<1.16.0       # Sparse matrix support and mathematical algorithms for TF-IDF calculations
+joblib>=1.4.0,<1.5.0        # Lightweight pipelining and data persistence utility for scikit-learn
+threadpoolctl>=3.5.0,<3.6.0 # Thread control for native numerical libraries

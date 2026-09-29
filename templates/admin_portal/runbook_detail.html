@@ -47,20 +47,70 @@
         </div>
 
         <!-- Automation Module Block -->
-        <div class="card card-custom shadow-sm border-warning-subtle mb-4">
+        <div class="card card-custom shadow-sm border-info-subtle mb-4">
             <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
-                <h5 class="mb-0 fw-bold text-warning-emphasis"><i class="bi bi-terminal-fill me-2"></i>Automation Script Hook</h5>
+                <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-cpu-fill text-primary me-2"></i>Automation Script Action</h5>
                 {% if runbook.automation_action %}
-                    <code>{{ runbook.automation_action }}</code>
+                    <code class="text-primary bg-light px-2 py-1 rounded border">{{ runbook.automation_action }}</code>
                 {% else %}
                     <span class="text-muted small">None Linked</span>
                 {% endif %}
             </div>
-            <div class="card-body py-4 text-center">
-                <div class="alert alert-warning mb-0 border-0" role="alert">
-                    <h6 class="alert-heading fw-bold mb-2"><i class="bi bi-exclamation-triangle-fill me-1"></i> Automation Not Available</h6>
-                    <p class="small mb-0">Script hooks are configuration metadata for this phase. Script execution becomes active in Phase 6.</p>
-                </div>
+            <div class="card-body py-3">
+                {% if runbook.automation_action %}
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <span class="badge bg-success-subtle text-success border border-success-subtle me-2">Allowlisted Safe Action</span>
+                            <span class="badge bg-secondary-subtle text-secondary border">Simulation Mode</span>
+                        </div>
+                        <span class="text-muted small">Strictly controlled mock execution</span>
+                    </div>
+                {% else %}
+                    <p class="small text-muted mb-0">No automated remediation hook is attached to this runbook. Human intervention required.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Community & Incident Feedback (Part 10 & 11) -->
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-dark">
+                    <i class="bi bi-chat-square-quote text-primary me-2"></i>Operator & Incident Feedback ({{ feedbacks|length }})
+                </h5>
+                <a href="{% url 'runbook_edit' runbook.pk %}" class="btn btn-sm btn-outline-primary fw-semibold">
+                    <i class="bi bi-pencil-square me-1"></i> Edit Procedure
+                </a>
+            </div>
+            <div class="card-body">
+                {% if feedbacks %}
+                    <div class="list-group list-group-flush">
+                        {% for fb in feedbacks %}
+                        <div class="list-group-item px-0 py-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <div>
+                                    <span class="badge {% if fb.rating >= 4 %}bg-success{% elif fb.rating == 3 %}bg-warning text-dark{% else %}bg-danger{% endif %} me-2">
+                                        <i class="bi bi-star-fill"></i> {{ fb.rating }}/5
+                                    </span>
+                                    <a href="{% url 'admin_incident_detail' fb.incident.pk %}" class="fw-semibold text-decoration-none">
+                                        {{ fb.incident.incident_number }}
+                                    </a>
+                                </div>
+                                <span class="text-muted small">{{ fb.created_at|date:"d M Y • H:i" }}</span>
+                            </div>
+                            <p class="small text-secondary mb-1" style="line-height: 1.5;">
+                                {{ fb.comment|default:"No written feedback provided." }}
+                            </p>
+                            <div class="text-muted small" style="font-size: 0.75rem;">
+                                Submitted by: <strong>{{ fb.user.username }}</strong>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="py-3 text-center text-muted small">
+                        <i class="bi bi-info-circle me-1"></i> No operator feedback recorded for this runbook yet. Feedback submitted on resolved tickets will appear here to drive procedure improvements.
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -104,6 +154,10 @@
             <div class="card-body d-flex flex-column gap-3">
                 <a href="{% url 'runbook_edit' runbook.pk %}" class="btn btn-outline-primary w-100 fw-semibold">
                     <i class="bi bi-pencil-square me-1"></i> Edit Runbook
+                </a>
+
+                <a href="{% url 'runbook_feedback_list' %}" class="btn btn-outline-secondary w-100 fw-semibold">
+                    <i class="bi bi-journal-arrow-up me-1"></i> All Runbook Feedback
                 </a>
 
                 <!-- Soft Active Toggle POST action -->

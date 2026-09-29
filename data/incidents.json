@@ -1,0 +1,134 @@
+[
+  {
+    "id": "INC-SYN-001",
+    "title": "Apache web server process terminated",
+    "description": "Production website is unavailable and returning connection refused error. Apache service appears inactive.",
+    "category": "SERVER",
+    "priority": "HIGH",
+    "expected_intent": "Service Outage",
+    "expected_service": "Web Server",
+    "expected_priority": "P1",
+    "expected_runbook": "Restart Apache Web Server"
+  },
+  {
+    "id": "INC-SYN-002",
+    "title": "Nginx proxy returning HTTP 502 bad gateway",
+    "description": "Users are encountering 502 Bad Gateway and connection refused errors when accessing the web portal via Nginx.",
+    "category": "SERVER",
+    "priority": "HIGH",
+    "expected_intent": "Service Outage",
+    "expected_service": "Web Server",
+    "expected_priority": "P1",
+    "expected_runbook": "Restart Nginx Web Server"
+  },
+  {
+    "id": "INC-SYN-003",
+    "title": "PostgreSQL database connection refused",
+    "description": "Backend services cannot connect to PostgreSQL database. Application queries are failing with connection timeout.",
+    "category": "DATABASE",
+    "priority": "CRITICAL",
+    "expected_intent": "Database Issue",
+    "expected_service": "Database",
+    "expected_priority": "P2",
+    "expected_runbook": "PostgreSQL Connection Recovery"
+  },
+  {
+    "id": "INC-SYN-004",
+    "title": "MySQL service unreachable on default port 3306",
+    "description": "Application database errors reported across multiple microservices. MySQL connection refused.",
+    "category": "DATABASE",
+    "priority": "CRITICAL",
+    "expected_intent": "Database Issue",
+    "expected_service": "Database",
+    "expected_priority": "P2",
+    "expected_runbook": "MySQL Service Recovery"
+  },
+  {
+    "id": "INC-SYN-005",
+    "title": "Root storage partition disk space full",
+    "description": "Disk usage above threshold on primary volume. Application unable to write temporary files and logs.",
+    "category": "STORAGE",
+    "priority": "MEDIUM",
+    "expected_intent": "Storage Issue",
+    "expected_service": "Storage",
+    "expected_priority": "P2",
+    "expected_runbook": "Clear Disk Space"
+  },
+  {
+    "id": "INC-SYN-006",
+    "title": "Intermittent packet loss on internal subnet",
+    "description": "Employees experiencing high latency and packet loss when reaching internal gateway services.",
+    "category": "NETWORK",
+    "priority": "MEDIUM",
+    "expected_intent": "Network Issue",
+    "expected_service": "Network",
+    "expected_priority": "P3",
+    "expected_runbook": "Network Connectivity Troubleshooting"
+  },
+  {
+    "id": "INC-SYN-007",
+    "title": "Internal hostname DNS resolution failing",
+    "description": "Workstations cannot resolve internal domains. Unknown host error returned during DNS queries.",
+    "category": "NETWORK",
+    "priority": "MEDIUM",
+    "expected_intent": "Network Issue",
+    "expected_service": "Network",
+    "expected_priority": "P3",
+    "expected_runbook": "DNS Resolution Troubleshooting"
+  },
+  {
+    "id": "INC-SYN-008",
+    "title": "Web application backend not responding",
+    "description": "Application service inactive with HTTP 500 errors. System process stopped responding to requests.",
+    "category": "APPLICATION",
+    "priority": "HIGH",
+    "expected_intent": "Service Outage",
+    "expected_service": "Application",
+    "expected_priority": "P2",
+    "expected_runbook": "Application Service Restart"
+  },
+  {
+    "id": "INC-SYN-009",
+    "title": "Users receiving stale outdated cache data",
+    "description": "Application rendering inconsistent old data due to corrupted application cache entries.",
+    "category": "APPLICATION",
+    "priority": "LOW",
+    "expected_intent": "Service Degradation",
+    "expected_service": "Application",
+    "expected_priority": "P3",
+    "expected_runbook": "Clear Application Cache"
+  },
+  {
+    "id": "INC-SYN-010",
+    "title": "HTTPS browser certificate expired warning",
+    "description": "Users receiving TLS handshake failure and certificate expired warnings when navigating to the portal.",
+    "category": "SECURITY",
+    "priority": "HIGH",
+    "expected_intent": "Access Issue",
+    "expected_service": "Authentication",
+    "expected_priority": "P3",
+    "expected_runbook": "SSL Certificate Expiry Check"
+  },
+  {
+    "id": "INC-SYN-011",
+    "title": "CPU utilization consistently spiking at 100 percent",
+    "description": "High CPU usage diagnostic required. Server slow and requests timing out due to heavy compute load.",
+    "category": "SERVER",
+    "priority": "HIGH",
+    "expected_intent": "Service Degradation",
+    "expected_service": "Web Server",
+    "expected_priority": "P2",
+    "expected_runbook": "High CPU Usage Investigation"
+  },
+  {
+    "id": "INC-SYN-012",
+    "title": "Out of memory errors causing service crash",
+    "description": "Memory usage elevated with out of memory errors reported in syslog. System becoming sluggish.",
+    "category": "SERVER",
+    "priority": "HIGH",
+    "expected_intent": "Service Degradation",
+    "expected_service": "Web Server",
+    "expected_priority": "P2",
+    "expected_runbook": "High Memory Usage Investigation"
+  }
+]

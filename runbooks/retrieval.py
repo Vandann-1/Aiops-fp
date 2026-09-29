@@ -8,6 +8,43 @@ logger = logging.getLogger(__name__)
 # Configurable minimum match threshold. Similarity score must be >= 0.20 to recommend.
 MIN_MATCH_SCORE = 0.20
 
+def generate_citation(incident, runbook, match_score):
+    """
+    Extracts concrete evidence and citation metadata linking the incident to the recommended runbook.
+    """
+    import re
+    incident_text = f"{incident.title} {incident.description} {getattr(incident, 'intent', '')} {getattr(incident, 'service', '')}".lower()
+    raw_symptoms = [s.strip() for s in runbook.symptoms.splitlines() if s.strip()]
+    
+    # Identify symptoms whose keywords overlap with the incident description
+    matched_symptoms = []
+    for s in raw_symptoms:
+        words = [w.lower() for w in re.findall(r'\b[a-zA-Z]{3,}\b', s) if w.lower() not in {'with', 'from', 'this', 'that', 'have', 'been'}]
+        if any(w in incident_text for w in words):
+            matched_symptoms.append(s)
+
+    if not matched_symptoms and raw_symptoms:
+        matched_symptoms = raw_symptoms[:2]
+
+    steps_list = [step.strip() for step in runbook.steps.splitlines() if step.strip()]
+    relevant_steps = steps_list[:3] if steps_list else ["Follow standard procedure steps."]
+
+    category_match = (runbook.category == getattr(incident, 'category', ''))
+
+    return {
+        "runbook_number": runbook.runbook_number,
+        "title": runbook.title,
+        "match_score": match_score,
+        "match_score_percentage": round(match_score * 100, 2),
+        "matched_category": runbook.get_category_display(),
+        "category_match": category_match,
+        "matched_symptoms": matched_symptoms,
+        "evidence_symptoms": raw_symptoms[0] if raw_symptoms else runbook.description,
+        "relevant_steps": relevant_steps,
+        "citation_reference": runbook.runbook_number
+    }
+
+
 def retrieve_best_runbook(incident, actor=None):
     """
     NLP Retrieval Service.
@@ -26,24 +63,33 @@ def retrieve_best_runbook(incident, actor=None):
         if not active_runbooks:
             logger.warning("No active runbooks found in the database. Skipping retrieval.")
             try:
+                from incidents.models import Incident
                 from automation.audit import create_audit_log
                 from automation.models import AuditLog
-                create_audit_log(
-                    incident=incident,
-                    event_type=AuditLog.EventType.AI_ANALYSIS_COMPLETED,
-                    message="Local NLP analysis completed. No active runbooks available.",
-                    actor=actor
-                )
+                if isinstance(incident, Incident):
+                    create_audit_log(
+                        incident=incident,
+                        event_type=AuditLog.EventType.AI_ANALYSIS_COMPLETED,
+                        message="Local NLP analysis completed. No active runbooks available.",
+                        actor=actor
+                    )
             except Exception:
                 pass
             return {
                 "runbook": None,
                 "score": 0.0,
+                "match_score": 0.0,
+                "matched_category": None,
+                "matched_symptoms": [],
+                "citation_reference": None,
+                "citation": {},
                 "top_matches": []
             }
 
-        # 2. Build incident search text (combining title, description, category)
-        incident_text = f"{incident.title} {incident.description} {incident.category}"
+        # 2. Build incident search text (combining title, description, category, and normalized fields)
+        intent_info = getattr(incident, 'intent', '')
+        service_info = getattr(incident, 'service', '')
+        incident_text = f"{incident.title} {incident.description} {incident.category} {intent_info} {service_info}".strip()
 
         # 3. Build runbook corpus texts using title, description, symptoms, and category
         runbook_texts = []
@@ -80,44 +126,61 @@ def retrieve_best_runbook(incident, actor=None):
 
         # Phase 8: Record AI Analysis Completed audit event
         try:
+            from incidents.models import Incident
             from automation.audit import create_audit_log
             from automation.models import AuditLog
-            create_audit_log(
-                incident=incident,
-                event_type=AuditLog.EventType.AI_ANALYSIS_COMPLETED,
-                message="Local NLP analysis completed for the incident.",
-                actor=actor
-            )
+            if isinstance(incident, Incident):
+                create_audit_log(
+                    incident=incident,
+                    event_type=AuditLog.EventType.AI_ANALYSIS_COMPLETED,
+                    message="Local NLP analysis completed for the incident.",
+                    actor=actor
+                )
         except Exception as audit_err:
             logger.warning(f"Could not record AI_ANALYSIS_COMPLETED audit: {str(audit_err)}")
 
         # 9. Evaluate best match against threshold
         if matches and matches[0][1] >= MIN_MATCH_SCORE:
             best_match, best_score = matches[0]
-            logger.info(f"AI retrieval successfully matched incident to {best_match.runbook_number} (Score: {best_score:.4f})")
+            inc_id = getattr(incident, 'incident_number', 'INC-UNKNOWN')
+            logger.info(f"[{inc_id}] Retrieved runbook {best_match.runbook_number} (score: {best_score:.2f})")
             
+            # Generate structured citations and evidence
+            citation = generate_citation(incident, best_match, best_score)
+
             # Phase 8: Record Runbook Recommended audit event
             try:
+                from incidents.models import Incident
                 from automation.audit import create_audit_log
                 from automation.models import AuditLog
-                create_audit_log(
-                    incident=incident,
-                    event_type=AuditLog.EventType.RUNBOOK_RECOMMENDED,
-                    message=f"Runbook '{best_match.title}' recommended with a match score of {best_score * 100:.1f}%.",
-                    actor=actor,
-                    metadata={
-                        "runbook_id": best_match.id,
-                        "runbook_number": best_match.runbook_number,
-                        "runbook_title": best_match.title,
-                        "match_score": best_score
-                    }
-                )
+                if isinstance(incident, Incident):
+                    create_audit_log(
+                        incident=incident,
+                        event_type=AuditLog.EventType.RUNBOOK_RECOMMENDED,
+                        message=f"Runbook '{best_match.title}' recommended with a match score of {best_score * 100:.1f}%.",
+                        actor=actor,
+                        metadata={
+                            "runbook_id": best_match.id,
+                            "runbook_number": best_match.runbook_number,
+                            "runbook_title": best_match.title,
+                            "match_score": best_score,
+                            "citation_reference": citation["citation_reference"],
+                            "matched_category": citation["matched_category"],
+                            "matched_symptoms": citation["matched_symptoms"]
+                        }
+                    )
             except Exception as audit_err:
                 logger.warning(f"Could not record RUNBOOK_RECOMMENDED audit: {str(audit_err)}")
+
 
             return {
                 "runbook": best_match,
                 "score": best_score,
+                "match_score": best_score,
+                "matched_category": citation["matched_category"],
+                "matched_symptoms": citation["matched_symptoms"],
+                "citation_reference": citation["citation_reference"],
+                "citation": citation,
                 "top_matches": top_matches
             }
         else:
@@ -125,6 +188,11 @@ def retrieve_best_runbook(incident, actor=None):
             return {
                 "runbook": None,
                 "score": 0.0,
+                "match_score": 0.0,
+                "matched_category": None,
+                "matched_symptoms": [],
+                "citation_reference": None,
+                "citation": {},
                 "top_matches": top_matches
             }
 
@@ -133,5 +201,14 @@ def retrieve_best_runbook(incident, actor=None):
         return {
             "runbook": None,
             "score": 0.0,
+            "match_score": 0.0,
+            "matched_category": None,
+            "matched_symptoms": [],
+            "citation_reference": None,
+            "citation": {},
             "top_matches": []
         }
+
+# Backward compatibility / semantic alias
+retrieve_runbooks_for_incident = retrieve_best_runbook
+

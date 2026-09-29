@@ -45,6 +45,42 @@
             </div>
         </div>
 
+        <!-- AI-Assisted Triage & Normalization Card (Parts 1, 2, 3) -->
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-diagram-3-fill text-primary me-2"></i>AI-Assisted Classification</h5>
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 0.72rem;">Local NLP Triage</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-sm-4">
+                        <span class="text-secondary small d-block">Intent</span>
+                        <strong class="text-dark">{{ incident.intent|default:"Unknown" }}</strong>
+                    </div>
+                    <div class="col-sm-4">
+                        <span class="text-secondary small d-block">Service</span>
+                        <strong class="text-dark">{{ incident.service|default:"Unknown" }}</strong>
+                    </div>
+                    <div class="col-sm-4">
+                        <span class="text-secondary small d-block">Suggested Priority</span>
+                        <span class="badge bg-warning-subtle text-dark border px-2.5 py-1 fw-bold">
+                            {{ incident.classified_priority|default:"P3" }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="bg-light p-3 rounded border mb-3">
+                    <div class="small text-secondary fw-semibold mb-1">Normalized Problem Description:</div>
+                    <div class="text-dark small" style="line-height: 1.5;">{{ incident.normalized_description|default:incident.description }}</div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center text-muted small pt-2 border-top">
+                    <span><i class="bi bi-info-circle me-1"></i> Method: <strong>{{ incident.classification_method|default:"Rule-based local classification" }}</strong></span>
+                    <span class="text-secondary fst-italic">Deterministic in-process engine (No external LLM)</span>
+                </div>
+            </div>
+        </div>
+
         <!-- AI Analysis & Runbook Recommendation -->
         <div class="card card-custom shadow-sm mb-4">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
@@ -80,6 +116,47 @@
                                     <i class="bi bi-exclamation-triangle-fill me-1"></i> Previously recommended runbook is now inactive. Please run analysis again.
                                 </div>
                             {% endif %}
+
+                            <!-- Runbook Evidence & Citations Panel (Parts 4 & 5) -->
+                            <div class="border rounded p-3 bg-light-subtle mb-4">
+                                <h6 class="fw-bold text-dark mb-2" style="font-size: 0.82rem;">
+                                    <i class="bi bi-journal-check text-primary me-1"></i> Why this runbook was recommended (Evidence & Citations)
+                                </h6>
+                                <div class="row g-2 small mb-2">
+                                    <div class="col-sm-6">
+                                        <span class="text-secondary d-block">Runbook Reference:</span>
+                                        <code class="text-primary fw-bold">{{ rec.citation.runbook_number|default:rec.runbook.runbook_number }}</code>
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <span class="text-secondary d-block">Category Match:</span>
+                                        <span class="badge {% if rec.runbook.category == incident.category %}bg-success-subtle text-success-emphasis border border-success-subtle{% else %}bg-secondary-subtle text-dark border{% endif %}">
+                                            {{ rec.runbook.get_category_display }} {% if rec.runbook.category == incident.category %}(Matched Category){% endif %}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div class="small mb-2">
+                                    <strong class="text-secondary d-block mb-1">Matched Symptoms:</strong>
+                                    <ul class="mb-1 ps-3 text-secondary">
+                                        {% for symptom in rec.citation.matched_symptoms %}
+                                            <li><span class="badge bg-info-subtle text-dark border me-1">Evidence</span> {{ symptom }}</li>
+                                        {% empty %}
+                                            <li><span class="badge bg-info-subtle text-dark border me-1">Evidence</span> {{ rec.runbook.symptoms|truncatechars:60 }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+
+                                <div class="small">
+                                    <strong class="text-secondary d-block mb-1">Relevant Action Steps Cited:</strong>
+                                    <ol class="mb-0 ps-3 text-secondary">
+                                        {% for step in rec.citation.relevant_steps %}
+                                            <li>{{ step }}</li>
+                                        {% empty %}
+                                            <li>Execute troubleshooting procedure according to runbook documentation.</li>
+                                        {% endfor %}
+                                    </ol>
+                                </div>
+                            </div>
 
                             <h6 class="fw-bold text-secondary text-uppercase small mb-2" style="font-size: 0.72rem; letter-spacing: 0.05em;">Description</h6>
                             <p class="text-secondary small mb-3" style="line-height: 1.5;">{{ rec.runbook.description }}</p>
@@ -163,6 +240,70 @@
                         <li>Execution is running in simulation mode.</li>
                     </ul>
                 </div>
+
+                <!-- Diagnostic Safety Checklist (Part 6) -->
+                {% if checklist %}
+                <div class="border rounded p-3 bg-white mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="fw-bold text-dark mb-0" style="font-size: 0.85rem;">
+                            <i class="bi bi-clipboard-check text-primary me-1"></i> Pre-Automation Diagnostic Checklist
+                        </h6>
+                        <span class="badge {% if checklist.all_passed %}bg-success{% else %}bg-warning text-dark{% endif %}" style="font-size: 0.72rem;">
+                            {{ checklist.passed_count }}/{{ checklist.total_count }} Passed
+                        </span>
+                    </div>
+                    <ul class="list-group list-group-flush small mb-0">
+                        {% for item in checklist.items %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-1.5 border-0">
+                                <span>
+                                    {% if item.passed %}
+                                        <i class="bi bi-check-circle-fill text-success me-1.5"></i>
+                                    {% else %}
+                                        <i class="bi bi-x-circle-fill text-danger me-1.5"></i>
+                                    {% endif %}
+                                    {{ item.label }}
+                                </span>
+                                <span class="text-muted text-end small" style="font-size: 0.75rem;">{{ item.detail }}</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <!-- Dry-Run & Reversible Action Metadata (Parts 7 & 8) -->
+                {% if dry_run %}
+                <div class="border rounded p-3 bg-light mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="fw-bold text-dark mb-0" style="font-size: 0.85rem;">
+                            <i class="bi bi-eye text-primary me-1"></i> Dry-Run Simulation Preview
+                        </h6>
+                        <span class="badge bg-secondary text-white" style="font-size: 0.7rem;">Simulation Only</span>
+                    </div>
+                    <div class="row g-2 small text-secondary">
+                        <div class="col-sm-6">
+                            <strong>Action:</strong> <code>{{ dry_run.action_name }}</code>
+                        </div>
+                        <div class="col-sm-6">
+                            <strong>Mode:</strong> {{ dry_run.mode }}
+                        </div>
+                        <div class="col-sm-6">
+                            <strong>Expected Result:</strong> {{ dry_run.expected_result }}
+                        </div>
+                        <div class="col-sm-6">
+                            <strong>Risk Level:</strong> <span class="badge bg-light text-dark border">{{ dry_run.risk }}</span>
+                        </div>
+                        <div class="col-sm-6">
+                            <strong>Actual System Command:</strong> {{ dry_run.actual_command }}
+                        </div>
+                        <div class="col-sm-6">
+                            <strong>Reversible Action:</strong> <span class="badge bg-success-subtle text-success border">{{ dry_run.reversible }}</span>
+                        </div>
+                        <div class="col-12 mt-1">
+                            <strong>Rollback Plan:</strong> {{ dry_run.rollback_plan }}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
 
                 {% if incident.runbook_recommendation and incident.runbook_recommendation.runbook %}
                     {% with rec=incident.runbook_recommendation %}
@@ -379,6 +520,32 @@
                 {% endif %}
             </div>
         </div>
+
+        <!-- Employee Feedback Card (Part 10) -->
+        {% if incident.feedback %}
+        <div class="card card-custom shadow-sm mb-4 border-success-subtle">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-success"><i class="bi bi-star-fill text-warning me-2"></i>Employee Feedback</h5>
+                <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">{{ incident.feedback.rating }}/5 ★</span>
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <strong class="text-dark">Runbook Usefulness Rating:</strong>
+                    <span class="text-warning">
+                        {% for i in "12345"|make_list %}
+                            {% if forloop.counter <= incident.feedback.rating %}★{% else %}☆{% endif %}
+                        {% endfor %}
+                    </span>
+                </div>
+                {% if incident.feedback.comment %}
+                    <div class="p-2.5 bg-light rounded border small text-secondary mb-2">
+                        "{{ incident.feedback.comment }}"
+                    </div>
+                {% endif %}
+                <div class="text-muted small">Submitted by <strong>{{ incident.feedback.user.username }}</strong> on {{ incident.feedback.created_at|date:"d M Y • H:i" }}</div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Right Column: Operations Panel & Reporter Details & Timelines -->

@@ -102,6 +102,11 @@ class RunbookRecommendation(models.Model):
         default='tfidf',
         help_text="Algorithm identifier used to generate match scores"
     )
+    citation_metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Structured citation and evidence metadata"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -114,3 +119,21 @@ class RunbookRecommendation(models.Model):
     @property
     def match_score_percentage(self):
         return self.match_score * 100
+
+    @property
+    def citation(self):
+        if self.citation_metadata:
+            return self.citation_metadata
+        if self.runbook:
+            symptoms_list = [s.strip() for s in self.runbook.symptoms.splitlines() if s.strip()]
+            steps_list = [step.strip() for step in self.runbook.steps.splitlines() if step.strip()]
+            return {
+                "runbook_number": self.runbook.runbook_number,
+                "title": self.runbook.title,
+                "category": self.runbook.get_category_display(),
+                "matched_category": self.runbook.category == getattr(self.incident, 'category', ''),
+                "matched_symptoms": symptoms_list[:2] if symptoms_list else ["General service anomaly"],
+                "relevant_steps": steps_list[:3] if steps_list else ["Follow standard operational procedures."],
+            }
+        return {}
+

@@ -59,6 +59,11 @@
                             <i class="bi bi-speedometer2"></i> Operations Dashboard
                         </a>
                     </li>
+                    <li class="{% if request.resolver_match.url_name == 'admin_project_overview' %}active{% endif %}">
+                        <a href="{% url 'admin_project_overview' %}">
+                            <i class="bi bi-cpu-fill"></i> Capstone Overview
+                        </a>
+                    </li>
                     
                     <li class="sidebar-section-header text-secondary small px-3 mt-3 mb-1 fw-bold text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.05em;">Service Desk</li>
                     <li class="{% if request.resolver_match.url_name == 'admin_incident_list' or request.resolver_match.url_name == 'admin_incident_detail' %}active{% endif %}">
@@ -76,6 +81,11 @@
                     <li class="{% if request.resolver_match.url_name == 'runbook_list' or request.resolver_match.url_name == 'runbook_create' or request.resolver_match.url_name == 'runbook_detail' or request.resolver_match.url_name == 'runbook_edit' %}active{% endif %}">
                         <a href="{% url 'runbook_list' %}">
                             <i class="bi bi-journal-text"></i> Runbooks
+                        </a>
+                    </li>
+                    <li class="{% if request.resolver_match.url_name == 'runbook_feedback_list' %}active{% endif %}">
+                        <a href="{% url 'runbook_feedback_list' %}">
+                            <i class="bi bi-chat-square-quote"></i> Knowledge Feedback
                         </a>
                     </li>
                     

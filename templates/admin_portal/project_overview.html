@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+
+{% block title %}Capstone System Overview - AIOps Service Desk{% endblock %}
+{% block page_title %}Capstone Architecture & Telemetry Console{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Top Banner -->
+    <div class="col-12">
+        <div class="card card-custom border-primary shadow-sm bg-light">
+            <div class="card-body p-4">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                    <div>
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <span class="badge bg-primary px-3 py-1 text-uppercase fw-bold" style="letter-spacing: 0.05em;">Capstone Project</span>
+                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2.5 py-1 fw-semibold">Local NLP • TF-IDF</span>
+                            <span class="badge bg-secondary-subtle text-secondary border px-2.5 py-1 fw-semibold">Simulation Mode</span>
+                        </div>
+                        <h3 class="fw-bold text-dark mb-1">AIOps Service Desk with Runbook Retrieval, Safe Automation & Human Approval</h3>
+                        <p class="text-secondary mb-0 small" style="max-width: 900px; line-height: 1.6;">
+                            Deterministic ticket normalization, TF-IDF + Cosine Similarity runbook retrieval with citation evidence, strict human-in-the-loop approval gates, allowlisted in-process simulation automation, and post-execution verification.
+                        </p>
+                    </div>
+                    <div class="d-flex flex-column align-items-md-end gap-2">
+                        <span class="badge bg-white text-dark border px-3 py-2 fw-medium shadow-sm">
+                            <i class="bi bi-shield-check text-success me-1"></i> Zero External AI APIs • Air-Gapped Safe
+                        </span>
+                        <a href="{% url 'admin_dashboard' %}" class="btn btn-sm btn-primary fw-semibold">
+                            <i class="bi bi-speedometer2 me-1"></i> Admin Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Telemetry KPI Cards -->
+    <div class="col-md-4 col-xl-2">
+        <div class="card card-custom shadow-sm h-100 border-start border-4 border-primary">
+            <div class="card-body p-3">
+                <div class="text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem;">Incidents</div>
+                <div class="fs-4 fw-bold text-dark mt-1">{{ total_incidents }}</div>
+                <div class="small text-muted mt-1" style="font-size: 0.75rem;">
+                    <span class="text-warning fw-semibold">{{ open_incidents }} open</span> • <span class="text-success fw-semibold">{{ resolved_incidents }} resolved</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 col-xl-2">
+        <div class="card card-custom shadow-sm h-100 border-start border-4 border-info">
+            <div class="card-body p-3">
+                <div class="text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem;">Runbooks</div>
+                <div class="fs-4 fw-bold text-dark mt-1">{{ total_runbooks }}</div>
+                <div class="small text-muted mt-1" style="font-size: 0.75rem;">
+                    <span class="text-success fw-semibold">{{ active_runbooks }} active</span> cataloged
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 col-xl-2">
+        <div class="card card-custom shadow-sm h-100 border-start border-4 border-warning">
+            <div class="card-body p-3">
+                <div class="text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem;">Human Approvals</div>
+                <div class="fs-4 fw-bold text-dark mt-1">{{ total_approvals }}</div>
+                <div class="small text-muted mt-1" style="font-size: 0.75rem;">
+                    <span class="text-success fw-semibold">{{ approved_count }} approved</span> • <span class="text-danger fw-semibold">{{ rejected_count }} rejected</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 col-xl-2">
+        <div class="card card-custom shadow-sm h-100 border-start border-4 border-success">
+            <div class="card-body p-3">
+                <div class="text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem;">Executions</div>
+                <div class="fs-4 fw-bold text-dark mt-1">{{ exec_success_rate }}%</div>
+                <div class="small text-muted mt-1" style="font-size: 0.75rem;">
+                    <span class="text-success fw-semibold">{{ successful_executions }} success</span> • <span class="text-danger fw-semibold">{{ failed_executions }} failed</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 col-xl-2">
+        <div class="card card-custom shadow-sm h-100 border-start border-4 border-purple">
+            <div class="card-body p-3">
+                <div class="text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem;">Mean TTR</div>
+                <div class="fs-4 fw-bold text-dark mt-1">
+                    {% if mean_resolution_minutes %}
+                        {{ mean_resolution_minutes }}m
+                    {% else %}
+                        <span class="fs-6 text-muted">Not yet measured</span>
+                    {% endif %}
+                </div>
+                <div class="small text-muted mt-1" style="font-size: 0.75rem;">Across resolved tickets</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 col-xl-2">
+        <div class="card card-custom shadow-sm h-100 border-start border-4 border-secondary">
+            <div class="card-body p-3">
+                <div class="text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem;">User Feedback</div>
+                <div class="fs-4 fw-bold text-dark mt-1">
+                    {% if avg_rating %}
+                        {{ avg_rating }}/5
+                    {% else %}
+                        <span class="fs-6 text-muted">Not yet measured</span>
+                    {% endif %}
+                </div>
+                <div class="small text-muted mt-1" style="font-size: 0.75rem;">{{ feedback_count }} ratings recorded</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Official Evaluation Suite Benchmark Metrics -->
+    {% if eval_results %}
+    <div class="col-12">
+        <div class="card card-custom shadow-sm border-primary-subtle">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                <div class="d-flex align-items-center gap-2">
+                    <h5 class="mb-0 fw-bold text-dark">
+                        <i class="bi bi-graph-up-arrow text-primary me-2"></i>Official Benchmark Evaluation Results
+                    </h5>
+                    <span class="badge bg-primary text-white">50 Synthetic Test Cases</span>
+                </div>
+                <span class="badge bg-secondary-subtle text-dark border px-2.5 py-1">
+                    Harness: <code>python manage.py evaluate_aiops</code>
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="row g-4 align-items-center">
+                    <div class="col-md-6 col-lg-3">
+                        <div class="p-3 bg-light rounded border text-center">
+                            <div class="text-muted small fw-semibold text-uppercase mb-1">AIOps TF-IDF Retrieval</div>
+                            <div class="fs-2 fw-bold text-success">{{ eval_results.aiops_retrieval_accuracy }}%</div>
+                            <div class="small text-muted mt-1">
+                                vs Baseline: <strong>{{ eval_results.baseline_retrieval_accuracy }}%</strong> 
+                                (<span class="text-success fw-bold">+{{ eval_results.retrieval_improvement }}%</span>)
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 col-lg-3">
+                        <div class="p-3 bg-light rounded border text-center">
+                            <div class="text-muted small fw-semibold text-uppercase mb-1">Citation Correctness</div>
+                            <div class="fs-2 fw-bold text-primary">{{ eval_results.citation_correctness_rate }}%</div>
+                            <div class="small text-muted mt-1">
+                                Matched symptoms & steps verified
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 col-lg-3">
+                        <div class="p-3 bg-light rounded border text-center">
+                            <div class="text-muted small fw-semibold text-uppercase mb-1">Unsafe Action Rejection</div>
+                            <div class="fs-2 fw-bold text-danger">{{ eval_results.unsafe_action_rejection_rate }}%</div>
+                            <div class="small text-muted mt-1">
+                                {{ eval_results.unsafe_actions_blocked }}/{{ eval_results.unsafe_actions_tested }} prohibited actions blocked
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 col-lg-3">
+                        <div class="p-3 bg-light rounded border text-center">
+                            <div class="text-muted small fw-semibold text-uppercase mb-1">Triage Breakdown</div>
+                            <div class="fs-5 fw-bold text-dark mt-1">
+                                Service: <span class="text-primary">{{ eval_results.service_accuracy }}%</span>
+                            </div>
+                            <div class="small text-muted mt-1">
+                                Intent: {{ eval_results.intent_accuracy }}% • Priority: {{ eval_results.priority_accuracy }}%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 6-Stage Operational Architecture Pipeline -->
+    <div class="col-lg-8">
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white py-3">
+                <h5 class="mb-0 fw-bold text-dark">
+                    <i class="bi bi-diagram-3 text-primary me-2"></i>End-to-End Operational Lifecycle Pipeline
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="timeline-stepper">
+                    <div class="step-item d-flex gap-3 mb-4">
+                        <div class="step-icon bg-primary text-white rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 38px; height: 38px; font-weight: bold;">
+                            1
+                        </div>
+                        <div class="step-content">
+                            <h6 class="fw-bold text-dark mb-1">Deterministic Ticket Normalization & Triage</h6>
+                            <p class="small text-secondary mb-1">
+                                Extracts structured metadata (Intent, Service, Priority) using deterministic keyword and regex heuristics. Normalizes unstructured descriptions without external LLM dependencies.
+                            </p>
+                            <span class="badge bg-light text-dark border">Intent: {{ intent_stats.0.intent|default:"Deterministic" }}</span>
+                            <span class="badge bg-light text-dark border">Priority: P1–P4</span>
+                        </div>
+                    </div>
+
+                    <div class="step-item d-flex gap-3 mb-4">
+                        <div class="step-icon bg-info text-white rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 38px; height: 38px; font-weight: bold;">
+                            2
+                        </div>
+                        <div class="step-content">
+                            <h6 class="fw-bold text-dark mb-1">Local NLP TF-IDF & Cosine Similarity Runbook Retrieval</h6>
+                            <p class="small text-secondary mb-1">
+                                Runs scikit-learn TF-IDF vectorizer over active runbook corpus. Matches incident text against runbook title, description, and indicative symptoms. Generates citation evidence metadata showing matched keywords and cited procedure steps.
+                            </p>
+                            <span class="badge bg-light text-dark border">Min Score: 20.00%</span>
+                            <span class="badge bg-light text-dark border">scikit-learn TfidfVectorizer</span>
+                        </div>
+                    </div>
+
+                    <div class="step-item d-flex gap-3 mb-4">
+                        <div class="step-icon bg-warning text-white rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 38px; height: 38px; font-weight: bold;">
+                            3
+                        </div>
+                        <div class="step-content">
+                            <h6 class="fw-bold text-dark mb-1">Pre-Execution Safety Verification & Human Approval Gate</h6>
+                            <p class="small text-secondary mb-1">
+                                Generates a 7-point Diagnostic Checklist evaluating system state, active runbook status, and safe allowlist presence. IT Admin inspects dry-run simulation preview and explicitly approves or rejects.
+                            </p>
+                            <span class="badge bg-light text-dark border">Human-in-the-Loop</span>
+                            <span class="badge bg-light text-dark border">Read-Only Dry Run</span>
+                        </div>
+                    </div>
+
+                    <div class="step-item d-flex gap-3 mb-4">
+                        <div class="step-icon bg-success text-white rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 38px; height: 38px; font-weight: bold;">
+                            4
+                        </div>
+                        <div class="step-content">
+                            <h6 class="fw-bold text-dark mb-1">Allowlisted In-Process Safe Automation Execution</h6>
+                            <p class="small text-secondary mb-1">
+                                Executes approved remediation strictly via predefined Python functions in <code>SAFE_ACTIONS</code> allowlist. Zero operating system commands, subprocesses, subshells, exec, or eval.
+                            </p>
+                            <span class="badge bg-light text-dark border">14 Allowlisted Actions</span>
+                            <span class="badge bg-light text-dark border">Simulation Mode</span>
+                        </div>
+                    </div>
+
+                    <div class="step-item d-flex gap-3 mb-4">
+                        <div class="step-icon bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 38px; height: 38px; font-weight: bold;">
+                            5
+                        </div>
+                        <div class="step-content">
+                            <h6 class="fw-bold text-dark mb-1">Simulated Post-Execution Verification</h6>
+                            <p class="small text-secondary mb-1">
+                                Verifies system health before marking ticket resolved. If verification passes, incident transitions to RESOLVED; if verification fails, ticket remains OPEN for human investigation.
+                            </p>
+                            <span class="badge bg-light text-dark border">Passed: {{ verifications_passed }}</span>
+                            <span class="badge bg-light text-dark border">Failed: {{ verifications_failed }}</span>
+                        </div>
+                    </div>
+
+                    <div class="step-item d-flex gap-3 mb-0">
+                        <div class="step-icon bg-dark text-white rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 38px; height: 38px; font-weight: bold;">
+                            6
+                        </div>
+                        <div class="step-content">
+                            <h6 class="fw-bold text-dark mb-1">Continuous Feedback & Knowledge Base Updates</h6>
+                            <p class="small text-secondary mb-1">
+                                Employees submit 1–5 star ratings and comments on resolved tickets. Telemetry directs IT Admins to refine runbook procedures, adjust indicative symptoms, and update remediation actions.
+                            </p>
+                            <span class="badge bg-light text-dark border">Feedback Loop Active</span>
+                            <span class="badge bg-light text-dark border">Knowledge Lifecycle</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Safety Controls & Quick Nav -->
+    <div class="col-lg-4">
+        <!-- Safety Controls Card -->
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white py-3">
+                <h5 class="mb-0 fw-bold text-dark">
+                    <i class="bi bi-shield-lock-fill text-success me-2"></i>Safety Model Guarantees
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush small">
+                    <li class="list-group-item py-3">
+                        <strong class="text-dark d-block mb-1">1. Air-Gapped Local NLP</strong>
+                        <span class="text-muted">No external AI APIs, no cloud LLM services, no data exfiltration risk.</span>
+                    </li>
+                    <li class="list-group-item py-3">
+                        <strong class="text-dark d-block mb-1">2. Strict Allowlist Enforcement</strong>
+                        <span class="text-muted">Only predefined functions in <code>SAFE_ACTIONS</code> can execute. Prohibited commands rejected unconditionally.</span>
+                    </li>
+                    <li class="list-group-item py-3">
+                        <strong class="text-dark d-block mb-1">3. Zero Shell / Subprocess Calls</strong>
+                        <span class="text-muted">Pure in-process Python mocks. No <code>os.system</code>, <code>subprocess</code>, or shell injections.</span>
+                    </li>
+                    <li class="list-group-item py-3">
+                        <strong class="text-dark d-block mb-1">4. Human-in-the-Loop Gate</strong>
+                        <span class="text-muted">Automation cannot execute without prior explicit IT Admin review and approval.</span>
+                    </li>
+                    <li class="list-group-item py-3">
+                        <strong class="text-dark d-block mb-1">5. Reversible Actions & Rollback</strong>
+                        <span class="text-muted">Every allowlisted action documents reversibility status and predefined rollback procedures.</span>
+                    </li>
+                    <li class="list-group-item py-3">
+                        <strong class="text-dark d-block mb-1">6. Verifiable Audit Trail</strong>
+                        <span class="text-muted">All approvals, executions, blocked attempts, and verifications recorded in append-only AuditLog.</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Management Navigation Card -->
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white py-3">
+                <h5 class="mb-0 fw-bold text-dark">
+                    <i class="bi bi-link-45deg text-primary me-2"></i>AIOps Workspaces
+                </h5>
+            </div>
+            <div class="card-body d-flex flex-column gap-2">
+                <a href="{% url 'admin_incident_list' %}" class="btn btn-outline-secondary d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-ticket-detailed me-2"></i> Incidents Queue</span>
+                    <span class="badge bg-secondary">{{ total_incidents }}</span>
+                </a>
+                <a href="{% url 'runbook_list' %}" class="btn btn-outline-secondary d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-journal-text me-2"></i> Knowledge Base</span>
+                    <span class="badge bg-secondary">{{ total_runbooks }}</span>
+                </a>
+                <a href="{% url 'approval_list' %}" class="btn btn-outline-secondary d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-person-check me-2"></i> Human Approvals</span>
+                    <span class="badge bg-secondary">{{ total_approvals }}</span>
+                </a>
+                <a href="{% url 'runbook_feedback_list' %}" class="btn btn-outline-secondary d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-chat-square-quote me-2"></i> Knowledge Feedback</span>
+                    <span class="badge bg-secondary">{{ feedback_count }}</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

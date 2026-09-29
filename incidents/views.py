@@ -7,8 +7,9 @@ from django.db.models import Q, Case, When, Value, IntegerField
 from django.http import HttpResponseNotAllowed
 from accounts.decorators import employee_required, it_admin_required
 from accounts.utils import is_it_admin, is_employee
-from .models import Incident, IncidentActivity
-from .forms import IncidentCreateForm, IncidentAdminUpdateForm
+from .models import Incident, IncidentActivity, IncidentFeedback
+from .forms import IncidentCreateForm, IncidentAdminUpdateForm, IncidentFeedbackForm
+
 
 logger = logging.getLogger(__name__)
 
@@ -140,13 +141,14 @@ def employee_incident_create(request):
                 best_score = result['score']
 
                 if best_runbook:
-                    # Persist the best recommendation
+                    # Persist the best recommendation with citations
                     RunbookRecommendation.objects.update_or_create(
                         incident=incident,
                         defaults={
                             'runbook': best_runbook,
                             'match_score': best_score,
-                            'retrieval_method': 'tfidf'
+                            'retrieval_method': 'tfidf',
+                            'citation_metadata': result.get('citation', {})
                         }
                     )
                     incident.status = Incident.Status.RECOMMENDATION_READY
@@ -226,11 +228,60 @@ def employee_incident_detail(request, pk):
     elif incident.status in [Incident.Status.IN_PROGRESS, Incident.Status.RESOLVED, Incident.Status.FAILED, Incident.Status.REJECTED]:
         status_progress = 5
 
+    feedback_form = None
+    if incident.status == Incident.Status.RESOLVED and not hasattr(incident, 'feedback'):
+        feedback_form = IncidentFeedbackForm()
+
     return render(request, 'employee/incident_detail.html', {
         'incident': incident,
         'activities': activities,
-        'status_progress': status_progress
+        'status_progress': status_progress,
+        'feedback_form': feedback_form
     })
+
+
+@login_required
+@employee_required
+def employee_submit_feedback(request, pk):
+    """
+    Phase 9 & 10: Allows employee to submit rating and comments for their resolved incident.
+    Enforces object-level ownership and prevents duplicate feedback.
+    """
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+
+    incident = get_object_or_404(Incident, pk=pk, created_by=request.user)
+
+    if incident.status != Incident.Status.RESOLVED:
+        messages.error(request, "Feedback can only be submitted once the incident is resolved.")
+        return redirect('employee_incident_detail', pk=incident.pk)
+
+    if hasattr(incident, 'feedback'):
+        messages.warning(request, "You have already submitted feedback for this incident.")
+        return redirect('employee_incident_detail', pk=incident.pk)
+
+    form = IncidentFeedbackForm(request.POST)
+    if form.is_valid():
+        feedback = form.save(commit=False)
+        feedback.incident = incident
+        feedback.user = request.user
+        feedback.save()
+
+        IncidentActivity.objects.create(
+            incident=incident,
+            actor=request.user,
+            action='FEEDBACK_SUBMITTED',
+            description=f"Incident feedback submitted with rating {feedback.rating}/5."
+        )
+
+        logger.info(f"[{incident.incident_number}] Feedback submitted: rating={feedback.rating}/5")
+
+        messages.success(request, "Thank you! Your feedback has been recorded.")
+    else:
+        messages.error(request, "Failed to submit feedback. Please check the rating.")
+
+    return redirect('employee_incident_detail', pk=incident.pk)
+
 
 @login_required
 @it_admin_required
@@ -329,12 +380,30 @@ def admin_incident_detail(request, pk):
     activities = incident.activities.all().order_by('-created_at')
     audit_logs = incident.audit_logs.all().select_related('actor').order_by('created_at')
     form = IncidentAdminUpdateForm(instance=incident)
+
+    # Phase 6 & 7: Safety checklist and Dry-Run preview
+    from automation.safety import get_diagnostic_checklist
+    from automation.actions import get_dry_run_preview, get_action_metadata
+
+    approval = incident.approvals.first() if incident.approvals.exists() else None
+    checklist = get_diagnostic_checklist(incident, approval=approval)
+    action_name = ""
+    if approval and approval.runbook:
+        action_name = approval.runbook.automation_action
+    elif hasattr(incident, 'runbook_recommendation') and incident.runbook_recommendation and incident.runbook_recommendation.runbook:
+        action_name = incident.runbook_recommendation.runbook.automation_action
+
+    dry_run = get_dry_run_preview(action_name) if action_name else None
+    action_meta = get_action_metadata(action_name) if action_name else None
     
     return render(request, 'admin_portal/incident_detail.html', {
         'incident': incident,
         'activities': activities,
         'audit_logs': audit_logs,
-        'form': form
+        'form': form,
+        'checklist': checklist,
+        'dry_run': dry_run,
+        'action_meta': action_meta,
     })
 
 @login_required
@@ -409,7 +478,8 @@ def admin_incident_analyze(request, pk):
                 defaults={
                     'runbook': best_runbook,
                     'match_score': best_score,
-                    'retrieval_method': 'tfidf'
+                    'retrieval_method': 'tfidf',
+                    'citation_metadata': result.get('citation', {})
                 }
             )
             incident.status = Incident.Status.RECOMMENDATION_READY
@@ -443,3 +513,104 @@ def admin_incident_analyze(request, pk):
         logger.error(f"Manual re-analysis failed: {str(e)}", exc_info=True)
 
     return redirect('admin_incident_detail', pk=incident.pk)
+
+
+@login_required
+@it_admin_required
+def project_overview(request):
+    """
+    Part 25: AIOps Capstone Compliance & Overview Console.
+    Provides verifiable operational status, architecture explanation, AI methodology,
+    safety controls, and live metrics from actual database entities.
+    """
+    from django.db.models import Avg, Count
+    from runbooks.models import Runbook, RunbookRecommendation
+    from automation.models import AutomationApproval, AutomationExecution, VerificationResult, AuditLog
+    from incidents.models import IncidentFeedback
+
+    total_incidents = Incident.objects.count()
+    open_incidents = Incident.objects.filter(status=Incident.Status.OPEN).count()
+    resolved_incidents = Incident.objects.filter(status=Incident.Status.RESOLVED).count()
+    analyzed_incidents = Incident.objects.exclude(intent='Unknown').count()
+
+    # Intent breakdown
+    intent_stats = Incident.objects.values('intent').annotate(count=Count('id')).order_by('-count')
+
+    # Knowledge Base
+    total_runbooks = Runbook.objects.count()
+    active_runbooks = Runbook.objects.filter(is_active=True).count()
+    recommendations_count = RunbookRecommendation.objects.count()
+
+    # Approvals & Executions
+    total_approvals = AutomationApproval.objects.count()
+    approved_count = AutomationApproval.objects.filter(status=AutomationApproval.ApprovalStatus.APPROVED).count()
+    rejected_count = AutomationApproval.objects.filter(status=AutomationApproval.ApprovalStatus.REJECTED).count()
+
+    successful_executions = AutomationExecution.objects.filter(status=AutomationExecution.ExecutionStatus.SUCCESS).count()
+    failed_executions = AutomationExecution.objects.filter(status=AutomationExecution.ExecutionStatus.FAILED).count()
+    blocked_executions = AutomationExecution.objects.filter(status=AutomationExecution.ExecutionStatus.BLOCKED).count()
+    total_executions = AutomationExecution.objects.count()
+
+    completed_execs = successful_executions + failed_executions
+    exec_success_rate = round((successful_executions / completed_execs * 100), 1) if completed_execs > 0 else 0.0
+
+    # Verifications
+    verifications_passed = VerificationResult.objects.filter(status=VerificationResult.Status.PASSED).count()
+    verifications_failed = VerificationResult.objects.filter(status=VerificationResult.Status.FAILED).count()
+
+    # Feedback
+    feedback_count = IncidentFeedback.objects.count()
+    avg_rating_res = IncidentFeedback.objects.aggregate(avg=Avg('rating'))['avg']
+    avg_rating = round(avg_rating_res, 2) if avg_rating_res is not None else None
+
+    # Resolution Time
+    resolved_with_time = Incident.objects.filter(status=Incident.Status.RESOLVED, resolved_at__isnull=False)
+    total_duration_secs = 0
+    valid_time_count = 0
+    for inc in resolved_with_time:
+        if inc.resolved_at and inc.created_at:
+            total_duration_secs += (inc.resolved_at - inc.created_at).total_seconds()
+            valid_time_count += 1
+    mean_resolution_minutes = round(total_duration_secs / (valid_time_count * 60), 1) if valid_time_count > 0 else None
+
+    # Unsafe action blocks
+    blocked_audit_count = AuditLog.objects.filter(event_type=AuditLog.EventType.AUTOMATION_BLOCKED).count()
+
+    import json
+    from django.conf import settings
+    eval_results = None
+    eval_file = settings.BASE_DIR / 'data' / 'evaluation_results.json'
+    if eval_file.exists():
+        try:
+            with open(eval_file, 'r', encoding='utf-8') as f:
+                eval_results = json.load(f)
+        except Exception:
+            eval_results = None
+
+    context = {
+        'total_incidents': total_incidents,
+        'open_incidents': open_incidents,
+        'resolved_incidents': resolved_incidents,
+        'analyzed_incidents': analyzed_incidents,
+        'intent_stats': intent_stats,
+        'total_runbooks': total_runbooks,
+        'active_runbooks': active_runbooks,
+        'recommendations_count': recommendations_count,
+        'total_approvals': total_approvals,
+        'approved_count': approved_count,
+        'rejected_count': rejected_count,
+        'successful_executions': successful_executions,
+        'failed_executions': failed_executions,
+        'blocked_executions': blocked_executions,
+        'total_executions': total_executions,
+        'exec_success_rate': exec_success_rate,
+        'verifications_passed': verifications_passed,
+        'verifications_failed': verifications_failed,
+        'feedback_count': feedback_count,
+        'avg_rating': avg_rating,
+        'mean_resolution_minutes': mean_resolution_minutes,
+        'blocked_audit_count': blocked_audit_count,
+        'eval_results': eval_results,
+    }
+    return render(request, 'admin_portal/project_overview.html', context)
+

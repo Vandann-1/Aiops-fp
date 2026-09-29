@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Knowledge Base Feedback & Updates - AIOps Service Desk{% endblock %}
+{% block page_title %}Runbook Feedback & Knowledge Updates{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-12">
+        <div class="alert alert-info py-3 px-4 border mb-4 shadow-sm" role="alert">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <h6 class="alert-heading fw-bold mb-0">
+                    <i class="bi bi-journal-arrow-up text-primary me-2"></i>Continuous Knowledge Refinement
+                </h6>
+                <span class="badge bg-primary text-white">Part 11 Telemetry</span>
+            </div>
+            <p class="small mb-0 text-secondary" style="line-height: 1.6;">
+                Review post-resolution ratings and operator feedback across all incidents. When a runbook receives low ratings or constructive comments, click <strong>Update Runbook</strong> to improve symptoms, diagnostic steps, or automation actions.
+            </p>
+        </div>
+
+        <div class="card card-custom shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                <h5 class="mb-0 fw-bold text-dark">
+                    <i class="bi bi-chat-square-quote text-primary me-2"></i>Incident Feedback Logs ({{ feedbacks|length }})
+                </h5>
+                <a href="{% url 'runbook_list' %}" class="btn btn-sm btn-outline-secondary fw-semibold">
+                    <i class="bi bi-journal-text me-1"></i> Knowledge Base Catalog
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if feedbacks %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" style="font-size: 0.88rem;">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 12%;">Incident</th>
+                                <th style="width: 25%;">Recommended Runbook</th>
+                                <th style="width: 12%;">Rating</th>
+                                <th style="width: 13%;">Submitted By</th>
+                                <th style="width: 26%;">Comment</th>
+                                <th style="width: 12%;" class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for fb in feedbacks %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'admin_incident_detail' fb.incident.pk %}" class="fw-bold text-decoration-none">
+                                        {{ fb.incident.incident_number }}
+                                    </a>
+                                </td>
+                                <td>
+                                    {% if fb.incident.runbook_recommendation and fb.incident.runbook_recommendation.runbook %}
+                                        <a href="{% url 'runbook_detail' fb.incident.runbook_recommendation.runbook.pk %}" class="text-decoration-none text-dark fw-medium">
+                                            <span class="badge bg-secondary-subtle text-dark border me-1">
+                                                {{ fb.incident.runbook_recommendation.runbook.runbook_number }}
+                                            </span>
+                                            {{ fb.incident.runbook_recommendation.runbook.title|truncatechars:35 }}
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted">--</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if fb.rating >= 4 %}
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                                            <i class="bi bi-star-fill me-1"></i> {{ fb.rating }}/5
+                                        </span>
+                                    {% elif fb.rating == 3 %}
+                                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1">
+                                            <i class="bi bi-star-fill me-1"></i> {{ fb.rating }}/5
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">
+                                            <i class="bi bi-star-fill me-1"></i> {{ fb.rating }}/5
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="fw-medium text-dark">{{ fb.user.username }}</span>
+                                    <div class="text-muted small" style="font-size: 0.72rem;">{{ fb.created_at|date:"d M Y • H:i" }}</div>
+                                </td>
+                                <td>
+                                    <div class="text-secondary" style="line-height: 1.4;">
+                                        {{ fb.comment|default:"No comment provided." }}
+                                    </div>
+                                </td>
+                                <td class="text-end">
+                                    {% if fb.incident.runbook_recommendation and fb.incident.runbook_recommendation.runbook %}
+                                        <a href="{% url 'runbook_edit' fb.incident.runbook_recommendation.runbook.pk %}" class="btn btn-sm btn-outline-primary" title="Update Runbook Knowledge">
+                                            <i class="bi bi-pencil-square me-1"></i> Update
+                                        </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="py-5 text-center">
+                    <i class="bi bi-chat-square-text text-muted mb-3" style="font-size: 2.5rem;"></i>
+                    <h6 class="text-secondary fw-semibold mb-1">No Runbook Feedback Recorded Yet</h6>
+                    <p class="text-muted small mb-0">When employees resolve tickets and rate runbook recommendations, feedback entries will appear here for review.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

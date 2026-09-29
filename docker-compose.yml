@@ -1,0 +1,49 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aiops_service_desk_web
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DJANGO_SETTINGS_MODULE=aiops_service_desk.settings
+      - PYTHONUNBUFFERED=1
+      # Note: Secret key can be configured via environment variable in production
+    volumes:
+      # Persistent SQLite database mount (Default development & capstone demonstration storage)
+      - ./db.sqlite3:/app/db.sqlite3
+      - ./static:/app/static
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; resp = urllib.request.urlopen('http://127.0.0.1:8000/login/'); exit(0 if resp.status == 200 else 1)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+# ==============================================================================
+# PRODUCTION OPTION (Documented for enterprise scale):
+# To switch from SQLite to PostgreSQL + pgvector for high-scale enterprise deployment:
+#
+# 1. Uncomment the db service below.
+# 2. Update settings.py DATABASES to use 'django.db.backends.postgresql'.
+# 3. Add 'psycopg2-binary' to requirements.txt.
+#
+#   db:
+#     image: pgvector/pgvector:pg16
+#     container_name: aiops_service_desk_db
+#     restart: unless-stopped
+#     environment:
+#       POSTGRES_DB: aiops_db
+#       POSTGRES_USER: aiops_user
+#       POSTGRES_PASSWORD: aiops_secure_password
+#     volumes:
+#       - postgres_data:/var/lib/postgresql/data
+#     ports:
+#       - "5432:5432"
+#
+# volumes:
+#   postgres_data:
+# ==============================================================================

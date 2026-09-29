@@ -131,3 +131,43 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Authentication configurations
 LOGIN_URL = '/login/'
+
+# Part 24: Standard Structured Logging Configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'aiops_standard': {
+            'format': '%(asctime)s [%(levelname)s] [%(name)s] %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'aiops_standard',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'incidents': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'runbooks': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'automation': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}

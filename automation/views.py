@@ -74,6 +74,8 @@ def admin_incident_request_approval(request, pk):
         metadata={"approval_id": approval.id, "runbook_id": runbook.id, "runbook_title": runbook.title}
     )
 
+    logger.info(f"[{incident.incident_number}] Approval requested for runbook {runbook.runbook_number}")
+
     messages.success(request, f"Approval request submitted for runbook {runbook.runbook_number}.")
     return redirect('approval_detail', pk=approval.pk)
 
@@ -109,11 +111,47 @@ def approval_detail(request, pk):
         recommendation is not None and 
         recommendation.runbook != approval.runbook
     )
+
+    from automation.safety import get_diagnostic_checklist
+    from automation.actions import get_dry_run_preview, get_action_metadata
+
+    checklist = get_diagnostic_checklist(approval.incident, approval=approval)
+    action_name = approval.runbook.automation_action if approval.runbook else ""
+    dry_run = get_dry_run_preview(action_name) if action_name else None
+    action_meta = get_action_metadata(action_name) if action_name else None
     
     return render(request, 'admin_portal/approval_detail.html', {
         'approval': approval,
-        'is_recommendation_mismatched': is_recommendation_mismatched
+        'is_recommendation_mismatched': is_recommendation_mismatched,
+        'checklist': checklist,
+        'dry_run': dry_run,
+        'action_meta': action_meta,
     })
+
+
+@login_required
+@it_admin_required
+def admin_approval_dry_run(request, pk):
+    """
+    Part 7: Explicit Dry-Run Preview Endpoint.
+    Displays what would happen during simulated execution without modifying
+    incident status, execution records, database state, or operating system state.
+    """
+    approval = get_object_or_404(AutomationApproval, pk=pk)
+    action_name = approval.runbook.automation_action if approval.runbook else ""
+
+    from automation.actions import get_dry_run_preview, get_action_metadata
+    from automation.safety import get_diagnostic_checklist
+
+    preview = get_dry_run_preview(action_name)
+    checklist = get_diagnostic_checklist(approval.incident, approval=approval)
+
+    return render(request, 'admin_portal/dry_run_detail.html', {
+        'approval': approval,
+        'preview': preview,
+        'checklist': checklist,
+    })
+
 
 
 @login_required
@@ -169,6 +207,8 @@ def approve_action(request, pk):
         actor=request.user,
         metadata={"approval_id": approval.id, "runbook_id": approval.runbook.id, "notes": approval.reason}
     )
+
+    logger.info(f"[{incident.incident_number}] Approval granted for runbook {approval.runbook.runbook_number} by {request.user.username}")
 
     messages.success(request, "Action approved. Automation execution will be handled by the next phase.")
     
@@ -228,6 +268,8 @@ def reject_action(request, pk):
         actor=request.user,
         metadata={"approval_id": approval.id, "runbook_id": approval.runbook.id, "reason": reason}
     )
+
+    logger.info(f"[{incident.incident_number}] Approval rejected for runbook {approval.runbook.runbook_number} by {request.user.username}: {reason}")
 
     messages.warning(request, "Automation was not approved. Manual investigation may be required.")
     
@@ -299,6 +341,8 @@ def admin_execution_verify(request, pk):
 
     from automation.verification import verify_execution
     is_passed, verification, msg = verify_execution(execution, actor=request.user)
+
+    logger.info(f"[{execution.approval.incident.incident_number}] Verification performed: status={'PASSED' if is_passed else 'FAILED'}")
 
     if is_passed:
         messages.success(request, f"Verification PASSED: {msg} Incident marked as RESOLVED.")

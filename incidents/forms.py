@@ -39,3 +39,30 @@ class IncidentAdminUpdateForm(forms.ModelForm):
                 'class': 'form-select'
             }),
         }
+
+
+class IncidentFeedbackForm(forms.ModelForm):
+    class Meta:
+        from .models import IncidentFeedback
+        model = IncidentFeedback
+        fields = ['rating', 'comment']
+        widgets = {
+            'rating': forms.Select(attrs={
+                'class': 'form-select'
+            }, choices=[
+                (5, '5 ★ - Extremely Useful'),
+                (4, '4 ★ - Very Useful'),
+                (3, '3 ★ - Moderately Useful'),
+                (2, '2 ★ - Somewhat Useful'),
+                (1, '1 ★ - Not Useful'),
+            ]),
+            'comment': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'What went well or what could be improved in this runbook?'
+            }),
+        }
+        help_texts = {
+            'comment': 'Optional suggestions to help IT Admins update and improve recovery runbooks.'
+        }
+

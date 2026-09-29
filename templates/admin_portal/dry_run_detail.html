@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Dry-Run Preview #{{ approval.id }} - AIOps Service Desk{% endblock %}
+{% block page_title %}Dry-Run Safety Inspection{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-lg-8">
+        <!-- Human Review Context Alert -->
+        <div class="alert alert-info py-3 px-4 border mb-4 shadow-sm" role="alert">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <h6 class="alert-heading fw-bold mb-0">
+                    <i class="bi bi-shield-check text-primary me-2"></i>Safe Automation Dry-Run Preview
+                </h6>
+                <span class="badge bg-primary text-white">SIMULATION ONLY</span>
+            </div>
+            <p class="small mb-0 text-secondary" style="line-height: 1.6;">
+                This inspection simulates the execution outcome and verifies safety gates prior to any state changes.
+                No real operating system commands, subprocesses, or destructive scripts will be executed.
+            </p>
+        </div>
+
+        <!-- Dry Run Summary Card -->
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-dark">
+                    <i class="bi bi-eye text-primary me-2"></i>Simulation Preview Details
+                </h5>
+                <span class="badge {% if preview.is_safe %}bg-success{% else %}bg-danger{% endif %} px-2.5 py-1">
+                    {% if preview.is_safe %}ALLOWLISTED ACTION{% else %}UNSAFE ACTION{% endif %}
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered align-middle mb-0" style="font-size: 0.9rem;">
+                        <tbody>
+                            <tr>
+                                <th class="bg-light text-secondary" style="width: 25%;">Target Incident</th>
+                                <td>
+                                    <a href="{% url 'admin_incident_detail' approval.incident.pk %}" class="fw-bold text-decoration-none">
+                                        {{ approval.incident.incident_number }}
+                                    </a> — {{ approval.incident.title }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light text-secondary">Recommended Runbook</th>
+                                <td>
+                                    <span class="badge bg-secondary-subtle text-dark border me-1">{{ approval.runbook.runbook_number }}</span>
+                                    <strong>{{ approval.runbook.title }}</strong>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light text-secondary">Action Identifier</th>
+                                <td><code class="text-dark bg-light px-2 py-0.5 rounded border">{{ preview.action_name }}</code></td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light text-secondary">Execution Mode</th>
+                                <td><span class="badge bg-info-subtle text-info-emphasis border">{{ preview.mode }}</span></td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light text-secondary">Actual System Command</th>
+                                <td><code class="text-muted">{{ preview.actual_command }}</code> (Strictly in-process Python simulation)</td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light text-secondary">Expected Result</th>
+                                <td class="text-dark fw-medium">{{ preview.expected_result }}</td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light text-secondary">Assessed Risk</th>
+                                <td>
+                                    <span class="badge {% if preview.risk == 'Low' %}bg-success-subtle text-success border border-success-subtle{% elif preview.risk == 'Medium' %}bg-warning-subtle text-warning-emphasis border border-warning-subtle{% else %}bg-danger-subtle text-danger border border-danger-subtle{% endif %}">
+                                        {{ preview.risk }} Risk
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light text-secondary">Reversible Action</th>
+                                <td>
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">{{ preview.reversible }}</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light text-secondary">Rollback Plan</th>
+                                <td class="text-secondary">{{ preview.rollback_plan }}</td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light text-secondary">State Changes Applied</th>
+                                <td class="text-muted fst-italic">{{ preview.state_changes }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Diagnostic Safety Checklist -->
+        {% if checklist %}
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-dark">
+                    <i class="bi bi-clipboard-check text-primary me-2"></i>Pre-Execution Safety Verification Checklist
+                </h5>
+                <span class="badge {% if checklist.all_passed %}bg-success{% else %}bg-warning text-dark{% endif %} px-2.5 py-1">
+                    {{ checklist.passed_count }}/{{ checklist.total_count }} Verified
+                </span>
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush" style="font-size: 0.88rem;">
+                    {% for item in checklist.items %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+                        <div class="d-flex align-items-center">
+                            {% if item.passed %}
+                                <i class="bi bi-check-circle-fill text-success fs-5 me-3"></i>
+                            {% else %}
+                                <i class="bi bi-x-circle-fill text-danger fs-5 me-3"></i>
+                            {% endif %}
+                            <div>
+                                <span class="fw-semibold text-dark">{{ item.label }}</span>
+                                <div class="text-muted small">{{ item.detail }}</div>
+                            </div>
+                        </div>
+                        <span class="badge {% if item.passed %}bg-success-subtle text-success border border-success-subtle{% else %}bg-danger-subtle text-danger border border-danger-subtle{% endif %}">
+                            {% if item.passed %}PASSED{% else %}FAILED{% endif %}
+                        </span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Right Column: Navigation & Human Decision Controls -->
+    <div class="col-lg-4">
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-shield-lock text-primary me-2"></i>Human Approval Gate</h5>
+            </div>
+            <div class="card-body">
+                <p class="small text-secondary mb-3">
+                    Approval Request <strong>#{{ approval.id }}</strong> is currently:
+                    <span class="badge bg-secondary text-white">{{ approval.get_status_display }}</span>
+                </p>
+                <div class="d-grid gap-2">
+                    <a href="{% url 'approval_detail' approval.pk %}" class="btn btn-primary fw-semibold">
+                        <i class="bi bi-arrow-left-circle me-1"></i> Return to Approval Review
+                    </a>
+                    <a href="{% url 'admin_incident_detail' approval.incident.pk %}" class="btn btn-outline-secondary fw-semibold">
+                        <i class="bi bi-ticket-detailed me-1"></i> View Incident Details
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-info-circle text-primary me-2"></i>Safety Model Rules</h5>
+            </div>
+            <div class="card-body small text-secondary" style="line-height: 1.6;">
+                <ul class="ps-3 mb-0">
+                    <li>Dry-run mode is strictly read-only and idempotent.</li>
+                    <li>No database writes or incident transitions are executed.</li>
+                    <li>Only actions present in <code>SAFE_ACTIONS</code> allowlist can proceed to execution.</li>
+                    <li>Unlisted commands or shell script injections are unconditionally rejected.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -80,7 +80,32 @@ def runbook_create(request):
 @it_admin_required
 def runbook_detail(request, pk):
     runbook = get_object_or_404(Runbook, pk=pk)
-    return render(request, 'admin_portal/runbook_detail.html', {'runbook': runbook})
+    from incidents.models import IncidentFeedback
+    feedbacks = IncidentFeedback.objects.filter(
+        incident__runbook_recommendation__runbook=runbook
+    ).select_related('incident', 'user').order_by('-created_at')
+    return render(request, 'admin_portal/runbook_detail.html', {
+        'runbook': runbook,
+        'feedbacks': feedbacks
+    })
+
+
+@login_required
+@it_admin_required
+def runbook_feedback_list(request):
+    """
+    Part 11: Knowledge Update Workflow.
+    Allows IT Admin to review user feedback on runbook recommendations and update procedures.
+    """
+    from incidents.models import IncidentFeedback
+    feedbacks = IncidentFeedback.objects.select_related(
+        'incident', 'incident__runbook_recommendation', 'incident__runbook_recommendation__runbook', 'user'
+    ).filter(incident__runbook_recommendation__runbook__isnull=False).order_by('-created_at')
+
+    return render(request, 'admin_portal/runbook_feedback_list.html', {
+        'feedbacks': feedbacks
+    })
+
 
 @login_required
 @it_admin_required

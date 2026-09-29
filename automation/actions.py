@@ -115,3 +115,186 @@ SAFE_ACTIONS = {
     "simulate_verification_failure": simulate_verification_failure,
 }
 
+# Part 7 & 8: Reversible Action & Dry-Run Safety Metadata Registry
+ACTION_METADATA = {
+    "restart_nginx": {
+        "action_name": "restart_nginx",
+        "description": "Simulates restarting the Nginx web server service.",
+        "mode": "Simulation",
+        "expected_result": "Nginx restart would be simulated.",
+        "risk": "Low",
+        "command": "None",
+        "reversible": True,
+        "rollback_description": "Restore previous simulated service state."
+    },
+    "restart_apache": {
+        "action_name": "restart_apache",
+        "description": "Simulates restarting the Apache HTTP server daemon.",
+        "mode": "Simulation",
+        "expected_result": "Apache restart would be simulated.",
+        "risk": "Low",
+        "command": "None",
+        "reversible": True,
+        "rollback_description": "Restore previous simulated service state."
+    },
+    "check_disk_space": {
+        "action_name": "check_disk_space",
+        "description": "Simulates inspecting storage partition utilisation and temporary file growth.",
+        "mode": "Simulation",
+        "expected_result": "Disk space check would be simulated.",
+        "risk": "Low",
+        "command": "None",
+        "reversible": True,
+        "rollback_description": "Read-only inspection; no rollback required."
+    },
+    "check_network": {
+        "action_name": "check_network",
+        "description": "Simulates testing gateway connectivity and latency ping health.",
+        "mode": "Simulation",
+        "expected_result": "Network diagnostic would be simulated.",
+        "risk": "Low",
+        "command": "None",
+        "reversible": True,
+        "rollback_description": "Diagnostic query; no rollback required."
+    },
+    "restart_postgresql": {
+        "action_name": "restart_postgresql",
+        "description": "Simulates restarting the PostgreSQL database service process.",
+        "mode": "Simulation",
+        "expected_result": "PostgreSQL service restart would be simulated.",
+        "risk": "Medium",
+        "command": "None",
+        "reversible": True,
+        "rollback_description": "Restore previous simulated service state."
+    },
+    "restart_mysql": {
+        "action_name": "restart_mysql",
+        "description": "Simulates restarting the MySQL relational database daemon.",
+        "mode": "Simulation",
+        "expected_result": "MySQL restart would be simulated.",
+        "risk": "Medium",
+        "command": "None",
+        "reversible": True,
+        "rollback_description": "Restore previous simulated service state."
+    },
+    "check_dns": {
+        "action_name": "check_dns",
+        "description": "Simulates performing DNS resolution queries against configured nameservers.",
+        "mode": "Simulation",
+        "expected_result": "DNS resolution diagnostic would be simulated.",
+        "risk": "Low",
+        "command": "None",
+        "reversible": True,
+        "rollback_description": "Diagnostic query; no rollback required."
+    },
+    "restart_application": {
+        "action_name": "restart_application",
+        "description": "Simulates cycling the application process worker pool.",
+        "mode": "Simulation",
+        "expected_result": "Application service restart would be simulated.",
+        "risk": "Medium",
+        "command": "None",
+        "reversible": True,
+        "rollback_description": "Restore previous simulated service state."
+    },
+    "clear_application_cache": {
+        "action_name": "clear_application_cache",
+        "description": "Simulates flushing stale application cache entries.",
+        "mode": "Simulation",
+        "expected_result": "Application cache flush would be simulated.",
+        "risk": "Low",
+        "command": "None",
+        "reversible": True,
+        "rollback_description": "Re-populate cache entries on subsequent requests."
+    },
+    "check_ssl_certificate": {
+        "action_name": "check_ssl_certificate",
+        "description": "Simulates testing TLS certificate validity and expiry dates.",
+        "mode": "Simulation",
+        "expected_result": "SSL certificate verification would be simulated.",
+        "risk": "Low",
+        "command": "None",
+        "reversible": True,
+        "rollback_description": "Diagnostic query; no rollback required."
+    },
+    "check_cpu_usage": {
+        "action_name": "check_cpu_usage",
+        "description": "Simulates querying processor utilization metrics.",
+        "mode": "Simulation",
+        "expected_result": "CPU usage diagnostic would be simulated.",
+        "risk": "Low",
+        "command": "None",
+        "reversible": True,
+        "rollback_description": "Diagnostic query; no rollback required."
+    },
+    "check_memory_usage": {
+        "action_name": "check_memory_usage",
+        "description": "Simulates querying system RAM and buffer memory allocation.",
+        "mode": "Simulation",
+        "expected_result": "Memory diagnostic would be simulated.",
+        "risk": "Low",
+        "command": "None",
+        "reversible": True,
+        "rollback_description": "Diagnostic query; no rollback required."
+    },
+    "simulate_failure": {
+        "action_name": "simulate_failure",
+        "description": "Diagnostic test hook configured to simulate an execution failure.",
+        "mode": "Simulation",
+        "expected_result": "Simulated failure response.",
+        "risk": "Low",
+        "command": "None",
+        "reversible": True,
+        "rollback_description": "Simulation failure hook; no rollback required."
+    },
+    "simulate_verification_failure": {
+        "action_name": "simulate_verification_failure",
+        "description": "Diagnostic test hook configured to simulate action success followed by verification failure.",
+        "mode": "Simulation",
+        "expected_result": "Action success with simulated verification check failure.",
+        "risk": "Low",
+        "command": "None",
+        "reversible": True,
+        "rollback_description": "Simulation failure hook; no rollback required."
+    }
+}
+
+
+def get_action_metadata(action_name):
+    """
+    Returns safety and reversibility metadata for a given action name.
+    """
+    if action_name in ACTION_METADATA:
+        return ACTION_METADATA[action_name]
+    return {
+        "action_name": action_name,
+        "description": "Unknown unlisted action.",
+        "mode": "Simulation",
+        "expected_result": "Action is not in safe allowlist and would be rejected.",
+        "risk": "High",
+        "command": "None",
+        "reversible": False,
+        "rollback_description": "Action not recognized; no rollback plan available."
+    }
+
+
+def get_dry_run_preview(action_name):
+    """
+    Part 7: Generates a dry-run preview report without executing anything.
+    Does NOT change incident status, execution status, or database state.
+    """
+    meta = get_action_metadata(action_name)
+    is_safe = action_name in SAFE_ACTIONS
+    return {
+        "action_name": action_name,
+        "mode": "Simulation",
+        "expected_result": meta["expected_result"],
+        "risk": meta["risk"],
+        "actual_command": "None",
+        "is_safe": is_safe,
+        "reversible": "Yes" if meta["reversible"] else "No",
+        "rollback_plan": meta["rollback_description"],
+        "state_changes": "None (Dry-run mode does not modify state)"
+    }
+
+

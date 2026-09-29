@@ -75,6 +75,61 @@
                 <div class="p-3 bg-light rounded border text-secondary mb-0" style="white-space: pre-wrap; font-size: 0.88rem; line-height: 1.6; font-family: inherit;">{{ approval.runbook.steps }}</div>
             </div>
         </div>
+
+        <!-- Pre-Automation Diagnostic Checklist (Part 6) -->
+        {% if checklist %}
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-clipboard-check text-primary me-2"></i>Pre-Automation Diagnostic Checklist</h5>
+                <span class="badge {% if checklist.all_passed %}bg-success{% else %}bg-warning text-dark{% endif %} px-2.5 py-1">
+                    {{ checklist.passed_count }}/{{ checklist.total_count }} Passed
+                </span>
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush" style="font-size: 0.88rem;">
+                    {% for item in checklist.items %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-2.5 px-3">
+                        <div class="d-flex align-items-center">
+                            {% if item.passed %}
+                                <i class="bi bi-check-circle-fill text-success fs-6 me-2"></i>
+                            {% else %}
+                                <i class="bi bi-x-circle-fill text-danger fs-6 me-2"></i>
+                            {% endif %}
+                            <span class="fw-medium text-dark">{{ item.label }}</span>
+                        </div>
+                        <span class="text-muted small">{{ item.detail }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Dry-Run Simulation Preview (Part 7 & 8) -->
+        {% if dry_run %}
+        <div class="card card-custom shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-eye text-primary me-2"></i>Dry-Run Simulation Preview</h5>
+                <span class="badge bg-secondary-subtle text-dark border">Simulation Only</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-2 small text-secondary mb-3">
+                    <div class="col-sm-6"><strong>Action:</strong> <code>{{ dry_run.action_name }}</code></div>
+                    <div class="col-sm-6"><strong>Mode:</strong> {{ dry_run.mode }}</div>
+                    <div class="col-sm-6"><strong>Expected Result:</strong> {{ dry_run.expected_result }}</div>
+                    <div class="col-sm-6"><strong>Risk:</strong> <span class="badge bg-light text-dark border">{{ dry_run.risk }}</span></div>
+                    <div class="col-sm-6"><strong>Reversible Action:</strong> <span class="badge bg-success-subtle text-success border">{{ dry_run.reversible }}</span></div>
+                    <div class="col-sm-6"><strong>Actual Command:</strong> {{ dry_run.actual_command }}</div>
+                    <div class="col-12 mt-1"><strong>Rollback Plan:</strong> {{ dry_run.rollback_plan }}</div>
+                </div>
+                <div class="d-flex justify-content-end">
+                    <a href="{% url 'admin_approval_dry_run' approval.pk %}" class="btn btn-sm btn-outline-primary fw-semibold">
+                        <i class="bi bi-play-circle me-1"></i> Open Full Dry-Run Inspection
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Right Column: Request Meta & Human Decisions -->

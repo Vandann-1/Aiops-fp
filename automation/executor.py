@@ -1,7 +1,10 @@
+import logging
 from django.utils import timezone
 from incidents.models import Incident, IncidentActivity
 from automation.models import AutomationApproval, AutomationExecution
 from automation.actions import SAFE_ACTIONS
+
+logger = logging.getLogger(__name__)
 
 def validate_automation(approval):
     """
@@ -125,6 +128,8 @@ def execute_approved_action(approval):
         actor=approval.reviewed_by or approval.requested_by,
         metadata={"action_name": action_name}
     )
+
+    logger.info(f"[{approval.incident.incident_number}] Automation execution started for action: {action_name}")
     
     try:
         # Retrieve the mock executor function from allowlist
@@ -153,6 +158,8 @@ def execute_approved_action(approval):
                 actor=approval.reviewed_by or approval.requested_by,
                 metadata={"action_name": action_name, "output": execution.output}
             )
+
+            logger.info(f"[{approval.incident.incident_number}] Automation execution completed: status=SUCCESS")
         else:
             execution.status = AutomationExecution.ExecutionStatus.FAILED
             execution.error_message = result.get("message", "Simulation failed.")
@@ -175,11 +182,15 @@ def execute_approved_action(approval):
                 actor=approval.reviewed_by or approval.requested_by,
                 metadata={"action_name": action_name, "error": execution.error_message}
             )
+
+            logger.info(f"[{approval.incident.incident_number}] Automation execution completed: status=FAILED")
     except Exception as e:
         execution.status = AutomationExecution.ExecutionStatus.FAILED
         execution.error_message = str(e)
         execution.completed_at = timezone.now()
         execution.save()
+
+        logger.info(f"[{approval.incident.incident_number}] Automation execution completed: status=FAILED")
         
         # Log failure
         IncidentActivity.objects.create(
